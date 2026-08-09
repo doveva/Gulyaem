@@ -1,14 +1,15 @@
 # Frontend
 
-React and TypeScript engineering UI for inspecting Gulyaem geo data. Stage 1.1 establishes the
-mobile-first `/debug/geo` shell, renders Saint Petersburg with MapLibre GL JS and reports backend
-readiness.
+React and TypeScript engineering UI for inspecting Gulyaem geo data. Stage 1.4a provides a
+responsive `/debug/geo` playground for evaluating the imported `StreetSegment` topology before
+districts and route generation are introduced.
 
 ## Responsibility
 
 - render the debug-first geo playground;
 - adapt API and GeoJSON responses to frontend models;
-- provide map layers, filters and inspectors added during later Stage 1 increments.
+- provide viewport statistics, layer and length filters, endpoints/boundary markers and a segment
+  inspector.
 
 ## Boundaries and dependencies
 
@@ -18,14 +19,17 @@ OpenFreeMap Liberty style and can be replaced without code changes.
 
 ## Main scenarios
 
-- open `/debug/geo` and interact with the base map;
-- see whether the API and PostGIS readiness endpoint is available;
-- use the placeholder debug panel that later stages extend with geo layers.
+- open `/debug/geo` at the committed dense-center fixture;
+- toggle `EXPLORE`, `ROUTABLE_ONLY`, `IGNORE`, the base map and endpoint markers independently;
+- filter by length and compare viewport count/length distributions;
+- select a segment and inspect its version, reason code and normalized attributes;
+- opt into source OSM metadata in non-production environments.
 
 ## Structure
 
 ```text
 src/App.tsx       application shell and map lifecycle
+src/geo.ts        GeoJSON/API models and pure viewport helpers
 src/styles.css    mobile-first debug UI
 Dockerfile        production static build
 nginx.conf        SPA fallback and container health endpoint
@@ -41,7 +45,8 @@ npm run dev
 ```
 
 Open `http://localhost:5173/debug/geo`. Run `npm run lint`, `npm test` and `npm run build` before
-hand-off.
+hand-off. Vite dependency pre-bundling excludes `maplibre-gl` for local development; the production
+build emits its worker as an explicit hashed asset and configures MapLibre with that URL.
 
 ## Configuration
 
@@ -49,13 +54,16 @@ hand-off.
 |---|---|---|
 | `VITE_API_URL` | `http://localhost:8080` | browser-visible backend URL |
 | `VITE_MAP_STYLE_URL` | OpenFreeMap Liberty | MapLibre style document URL |
+| `VITE_CITY_ID` | seeded Saint Petersburg UUID | city selected by the engineering playground |
 
 ## Limitations and technical debt
 
-Stage 1.1 contains only the base map and readiness state. StreetSegment layers, viewport data,
-filters and inspectors belong to subsequent Stage 1 increments.
+The playground intentionally has no district, route or coverage model. Requests are debounced by
+250 ms and stale requests are aborted. The API may ask the user to zoom in when the viewport is
+larger than 25 km² or contains more than 10,000 segments; the UI does not silently truncate data.
 
 ## Related documents
 
 - [`Stage 1 requirements`](../docs/stage%201/stage-1-requirements.md)
 - [`Architecture contract`](../docs/stage%201/architecture-contract.md)
+- [`Geo Playground bbox API ADR`](../docs/adr/0003-geo-playground-bbox-api.md)

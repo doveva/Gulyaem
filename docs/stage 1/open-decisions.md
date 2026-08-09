@@ -91,6 +91,11 @@ Decision based on same fixtures, not preference alone.
 
 ## OD-08 GeoJSON scalability
 
+**Stage 1.4a experiment:** bbox GeoJSON is implemented with a `25 km²` request limit and a hard
+`10 000` feature limit without silent truncation. Final Stage 2 confirmation remains open until
+browser payload/render measurements are recorded. See
+[`ADR-0003`](../adr/0003-geo-playground-bbox-api.md).
+
 Initial decision is bbox + GeoJSON.
 
 Need to measure whether representative test-area payload/rendering is sufficient for next stage.

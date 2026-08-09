@@ -95,7 +95,8 @@ make api DATABASE_URL='postgres://user:password@db.example/gulyaem?sslmode=requi
 
 Frontend-переменные `VITE_*` встраиваются во время сборки образа. После их изменения frontend
 нужно пересобрать. `VITE_MAP_STYLE_URL` по умолчанию указывает на публичный OpenFreeMap Liberty;
-стиль не является доменным контрактом и заменяется конфигурацией.
+стиль не является доменным контрактом и заменяется конфигурацией. `VITE_CITY_ID` выбирает город
+для инженерного playground; default совпадает с seeded UUID Санкт-Петербурга.
 
 `GEO_TEST_AREA` по умолчанию равен `spb-dense-center`. `NORMALIZATION_VERSION` входит в identity
 версии вместе с checksum: после изменения normalization rules его значение обязательно меняется.
@@ -140,8 +141,8 @@ make check
 
 Команда запускает Go tests/vet, frontend lint/tests/build и проверки документации.
 
-## Ограничения Stage 1.1
+## Ограничения Stage 1.4a
 
 Production deployment, backup/restore и rollback application-релиза пока не определены. Данные
-этого этапа локальные и воспроизводимые; эксплуатационные процедуры будут добавлены до первого
-удалённого окружения.
+этого этапа локальные и воспроизводимые. Районы, генерация маршрутов и coverage намеренно не входят
+в базовую визуализацию; решения по ним принимаются после оценки импортированной топологии.

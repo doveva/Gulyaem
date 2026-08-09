@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/doveva/Gulyaem/backend/internal/config"
+	"github.com/doveva/Gulyaem/backend/internal/geo/querying"
 	"github.com/doveva/Gulyaem/backend/internal/platform/database"
+	"github.com/doveva/Gulyaem/backend/internal/platform/database/geoquery"
 	"github.com/doveva/Gulyaem/backend/internal/transport/httpapi"
 )
 
@@ -39,12 +41,14 @@ func run() error {
 		return err
 	}
 	defer db.Close()
+	geoService := querying.NewService(geoquery.New(db))
 
 	handler := httpapi.NewHandler(httpapi.Dependencies{
 		Database:       db,
 		Logger:         logger,
 		Environment:    cfg.Environment,
 		AllowedOrigins: cfg.CORSAllowedOrigins,
+		Geo:            geoService,
 	})
 	server := &http.Server{
 		Addr:              cfg.HTTPAddress,

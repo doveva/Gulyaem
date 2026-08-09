@@ -1,46 +1,312 @@
-import { useEffect, useRef, useState } from 'react'
-import { Map, NavigationControl } from 'maplibre-gl'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { GeoJSONSource, Map, NavigationControl, setWorkerUrl, type MapMouseEvent } from 'maplibre-gl'
+import maplibreWorkerURL from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { isGeoPlaygroundPath } from './routing'
+import {
+  CITY_ID,
+  CLASSIFICATIONS,
+  EMPTY_STATISTICS,
+  emptyCollection,
+  endpointCollection,
+  parseLength,
+  segmentQuery,
+  type APIErrorPayload,
+  type AppliedFilters,
+  type Classification,
+  type GeoVersion,
+  type SegmentCollection,
+  type SegmentDetail,
+} from './geo'
 
 type ApiState = 'checking' | 'ready' | 'unavailable'
+type Visibility = Record<Classification, boolean>
 
 const apiURL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080'
 const mapStyleURL =
   import.meta.env.VITE_MAP_STYLE_URL ?? 'https://tiles.openfreemap.org/styles/liberty'
+const lineLayers: Record<Classification, string> = {
+  EXPLORE: 'segments-explore',
+  ROUTABLE_ONLY: 'segments-routable',
+  IGNORE: 'segments-ignore',
+}
+const classificationLabels: Record<Classification, string> = {
+  EXPLORE: 'Исследуемые',
+  ROUTABLE_ONLY: 'Только связность',
+  IGNORE: 'Исключённые',
+}
+const classificationColors: Record<Classification, string> = {
+  EXPLORE: '#35d3b4',
+  ROUTABLE_ONLY: '#f0b34d',
+  IGNORE: '#b77774',
+}
+
+setWorkerUrl(maplibreWorkerURL)
 
 export function App() {
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<Map | null>(null)
+  const baseLayerIDs = useRef<string[]>([])
+  const requestViewportRef = useRef<() => void>(() => undefined)
+  const viewportAbort = useRef<AbortController | null>(null)
+  const detailAbort = useRef<AbortController | null>(null)
+  const requestSequence = useRef(0)
+  const [mapReady, setMapReady] = useState(false)
   const [apiState, setApiState] = useState<ApiState>('checking')
+  const [version, setVersion] = useState<GeoVersion | null>(null)
+  const [collection, setCollection] = useState<SegmentCollection>(emptyCollection)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [visibility, setVisibility] = useState<Visibility>({
+    EXPLORE: true,
+    ROUTABLE_ONLY: true,
+    IGNORE: true,
+  })
+  const visibilityRef = useRef(visibility)
+  const [showBasemap, setShowBasemap] = useState(true)
+  const [showPoints, setShowPoints] = useState(true)
+  const [minimumInput, setMinimumInput] = useState('')
+  const [maximumInput, setMaximumInput] = useState('')
+  const [filterError, setFilterError] = useState<string | null>(null)
+  const [filters, setFilters] = useState<AppliedFilters>({ minLength: null, maxLength: null })
+  const filtersRef = useRef(filters)
+  const [selectedID, setSelectedID] = useState<string | null>(null)
+  const [selected, setSelected] = useState<SegmentDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [showDebug, setShowDebug] = useState(false)
+
+  useEffect(() => {
+    visibilityRef.current = visibility
+  }, [visibility])
+
+  useEffect(() => {
+    filtersRef.current = filters
+  }, [filters])
 
   useEffect(() => {
     if (!mapContainer.current || map.current) return
-
-    map.current = new Map({
+    const instance = new Map({
       container: mapContainer.current,
       style: mapStyleURL,
-      center: [30.3158, 59.9391],
-      zoom: 11,
+      center: [30.315, 59.9375],
+      zoom: 14,
+      minZoom: 13,
+      maxZoom: 20,
+      attributionControl: {},
     })
-    map.current.addControl(new NavigationControl(), 'bottom-right')
+    map.current = instance
+    instance.addControl(new NavigationControl(), 'bottom-right')
+
+    const clearViewport = () => {
+      setCollection(emptyCollection())
+      setError(null)
+      setLoading(false)
+    }
+
+    const requestViewport = () => {
+      if (!instance.getSource('segments')) return
+      if (instance.getZoom() < 13) {
+        clearViewport()
+        return
+      }
+      const classifications = CLASSIFICATIONS.filter((value) => visibilityRef.current[value])
+      if (classifications.length === 0) {
+        viewportAbort.current?.abort()
+        clearViewport()
+        return
+      }
+      const bounds = instance.getBounds()
+      const bbox: [number, number, number, number] = [
+        bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth(),
+      ]
+      viewportAbort.current?.abort()
+      const controller = new AbortController()
+      viewportAbort.current = controller
+      const sequence = ++requestSequence.current
+      setLoading(true)
+      setError(null)
+      fetch(`${apiURL}/api/v1/geo/segments?${segmentQuery(bbox, classifications, filtersRef.current)}`, {
+        signal: controller.signal,
+      })
+        .then(async (response) => {
+          if (!response.ok) {
+            const payload = (await response.json().catch(() => ({}))) as APIErrorPayload
+            throw new Error(payload.error?.message ?? `API вернул ${response.status}`)
+          }
+          return response.json() as Promise<SegmentCollection>
+        })
+        .then((result) => {
+          if (sequence !== requestSequence.current) return
+          setCollection(result)
+          setLoading(false)
+        })
+        .catch((cause: unknown) => {
+          if (controller.signal.aborted || sequence !== requestSequence.current) return
+          setLoading(false)
+          setError(cause instanceof Error ? cause.message : 'Не удалось загрузить сегменты')
+        })
+    }
+    requestViewportRef.current = requestViewport
+
+    let debounceTimer: number | undefined
+    const onMoveEnd = () => {
+      window.clearTimeout(debounceTimer)
+      debounceTimer = window.setTimeout(requestViewport, 250)
+    }
+    const onMapClick = (event: MapMouseEvent) => {
+      const layers = Object.values(lineLayers).filter((layer) => instance.getLayer(layer))
+      const feature = instance.queryRenderedFeatures(event.point, { layers })[0]
+      const id = feature?.properties?.id
+      if (typeof id === 'string') {
+        setDetailLoading(true)
+        setSelectedID(id)
+      }
+    }
+    const onMouseMove = (event: MapMouseEvent) => {
+      const layers = Object.values(lineLayers).filter((layer) => instance.getLayer(layer))
+      instance.getCanvas().style.cursor = instance.queryRenderedFeatures(event.point, { layers }).length > 0 ? 'pointer' : ''
+    }
+
+    instance.once('style.load', () => {
+      baseLayerIDs.current = (instance.getStyle().layers ?? []).map((layer) => layer.id)
+      instance.addSource('segments', { type: 'geojson', data: emptyCollection() })
+      for (const classification of CLASSIFICATIONS) {
+        instance.addLayer({
+          id: lineLayers[classification],
+          type: 'line',
+          source: 'segments',
+          filter: ['==', ['get', 'classification'], classification],
+          paint: {
+            'line-color': classificationColors[classification],
+            'line-width': ['interpolate', ['linear'], ['zoom'], 13, 2, 17, 5],
+            'line-opacity': classification === 'IGNORE' ? 0.72 : 0.9,
+          },
+        })
+      }
+      instance.addLayer({
+        id: 'segment-selection', type: 'line', source: 'segments',
+        filter: ['==', ['get', 'id'], ''],
+        paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.96 },
+      })
+      instance.addSource('segment-points', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+      instance.addLayer({
+        id: 'segment-endpoints', type: 'circle', source: 'segment-points',
+        filter: ['==', ['get', 'kind'], 'endpoint'],
+        paint: { 'circle-color': '#d8eee7', 'circle-radius': 2.2, 'circle-opacity': 0.55 },
+      })
+      instance.addLayer({
+        id: 'segment-boundaries', type: 'circle', source: 'segment-points',
+        filter: ['==', ['get', 'kind'], 'boundary'],
+        paint: { 'circle-color': '#fa73ad', 'circle-radius': 4.5, 'circle-stroke-color': '#fff', 'circle-stroke-width': 1 },
+      })
+      setMapReady(true)
+      instance.fitBounds([[30.3, 59.93], [30.33, 59.945]], { padding: 76, duration: 0, maxZoom: 15.2 })
+      requestViewport()
+    })
+    instance.on('moveend', onMoveEnd)
+    instance.on('click', onMapClick)
+    instance.on('mousemove', onMouseMove)
 
     return () => {
-      map.current?.remove()
+      window.clearTimeout(debounceTimer)
+      viewportAbort.current?.abort()
+      detailAbort.current?.abort()
+      instance.remove()
       map.current = null
     }
   }, [])
 
   useEffect(() => {
     const controller = new AbortController()
-    fetch(`${apiURL}/health/ready`, { signal: controller.signal })
-      .then((response) => {
-        setApiState(response.ok ? 'ready' : 'unavailable')
+    fetch(`${apiURL}/api/v1/cities/${CITY_ID}/geo-version`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`API вернул ${response.status}`)
+        return response.json() as Promise<GeoVersion>
+      })
+      .then((result) => {
+        setVersion(result)
+        setApiState('ready')
       })
       .catch(() => {
         if (!controller.signal.aborted) setApiState('unavailable')
       })
     return () => controller.abort()
   }, [])
+
+  useEffect(() => {
+    if (!mapReady || !map.current) return
+    const source = map.current.getSource('segments') as GeoJSONSource
+    source.setData(collection)
+    const pointSource = map.current.getSource('segment-points') as GeoJSONSource
+    pointSource.setData(endpointCollection(collection))
+  }, [collection, mapReady])
+
+  useEffect(() => {
+    if (!mapReady || !map.current) return
+    for (const classification of CLASSIFICATIONS) {
+      map.current.setLayoutProperty(lineLayers[classification], 'visibility', visibility[classification] ? 'visible' : 'none')
+    }
+    requestViewportRef.current()
+  }, [visibility, mapReady])
+
+  useEffect(() => {
+    if (!mapReady || !map.current) return
+    for (const layerID of baseLayerIDs.current) {
+      if (map.current.getLayer(layerID)) map.current.setLayoutProperty(layerID, 'visibility', showBasemap ? 'visible' : 'none')
+    }
+  }, [showBasemap, mapReady])
+
+  useEffect(() => {
+    if (!mapReady || !map.current) return
+    for (const layerID of ['segment-endpoints', 'segment-boundaries']) {
+      map.current.setLayoutProperty(layerID, 'visibility', showPoints ? 'visible' : 'none')
+    }
+  }, [showPoints, mapReady])
+
+  useEffect(() => {
+    if (!mapReady || !map.current) return
+    map.current.setFilter('segment-selection', ['==', ['get', 'id'], selectedID ?? ''])
+  }, [selectedID, mapReady])
+
+  useEffect(() => {
+    if (!selectedID) return
+    detailAbort.current?.abort()
+    const controller = new AbortController()
+    detailAbort.current = controller
+    fetch(`${apiURL}/api/v1/geo/segments/${selectedID}${showDebug ? '?debug=true' : ''}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`API вернул ${response.status}`)
+        return response.json() as Promise<SegmentDetail>
+      })
+      .then((result) => {
+        setSelected(result)
+        setDetailLoading(false)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setDetailLoading(false)
+      })
+    return () => controller.abort()
+  }, [selectedID, showDebug])
+
+  const statistics = collection.meta?.statistics ?? EMPTY_STATISTICS
+  const attributes = useMemo(() => selected ? Object.entries(selected.normalizedAttributes) : [], [selected])
+
+  const applyFilters = () => {
+    const minimum = parseLength(minimumInput)
+    const maximum = parseLength(maximumInput)
+    if (minimum === 'invalid' || maximum === 'invalid') {
+      setFilterError('Длина должна быть неотрицательным числом')
+      return
+    }
+    if (minimum !== null && maximum !== null && minimum > maximum) {
+      setFilterError('Минимум не может быть больше максимума')
+      return
+    }
+    setFilterError(null)
+    const next = { minLength: minimum, maxLength: maximum }
+    filtersRef.current = next
+    setFilters(next)
+    requestViewportRef.current()
+  }
 
   if (!isGeoPlaygroundPath(window.location.pathname)) {
     return (
@@ -55,41 +321,103 @@ export function App() {
 
   return (
     <main className="playground">
-      <div ref={mapContainer} className="map" aria-label="Карта Санкт-Петербурга" />
+      <div ref={mapContainer} className="map" aria-label="Карта сегментов центра Санкт-Петербурга" />
       <header className="topbar">
         <div>
-          <p className="eyebrow">Stage 1 · Geo Exploration</p>
-          <h1>ГуляЕм</h1>
+          <p className="eyebrow">Stage 1.4 · Geo Playground</p>
+          <h1>ГуляЕм <span>/ StreetSegment</span></h1>
         </div>
         <div className={`api-status api-status--${apiState}`} role="status">
           <span aria-hidden="true" />
-          {apiState === 'checking' && 'Проверяем API'}
-          {apiState === 'ready' && 'API и PostGIS готовы'}
+          {apiState === 'checking' && 'Проверяем геоданные'}
+          {apiState === 'ready' && `READY · ${version?.normalizationVersion ?? '—'}`}
           {apiState === 'unavailable' && 'API недоступен'}
         </div>
       </header>
-      <aside className="debug-panel">
-        <p className="panel-label">Слои</p>
-        <h2>Основа подключена</h2>
-        <p>
-          На следующем подэтапе здесь появятся версии геоданных, а затем слои собственных
-          StreetSegment.
-        </p>
-        <dl>
-          <div>
-            <dt>Город</dt>
-            <dd>Санкт-Петербург</dd>
+
+      <aside className="control-panel panel">
+        <div className="panel-heading">
+          <div><p className="panel-label">Видимый viewport</p><h2>Слои и фильтры</h2></div>
+          <span className={loading ? 'loading-dot loading-dot--active' : 'loading-dot'} aria-label={loading ? 'Загрузка' : 'Загружено'} />
+        </div>
+        <div className="classification-list">
+          {CLASSIFICATIONS.map((classification) => (
+            <label className="layer-toggle" key={classification}>
+              <input type="checkbox" checked={visibility[classification]} onChange={() => setVisibility((current) => ({ ...current, [classification]: !current[classification] }))} />
+              <i style={{ backgroundColor: classificationColors[classification] }} />
+              <span>{classificationLabels[classification]}</span>
+              <b>{classification === 'EXPLORE' ? statistics.exploreCount : classification === 'ROUTABLE_ONLY' ? statistics.routableOnlyCount : statistics.ignoreCount}</b>
+            </label>
+          ))}
+        </div>
+        <div className="secondary-toggles">
+          <label><input type="checkbox" checked={showBasemap} onChange={(event) => setShowBasemap(event.target.checked)} /> Подложка</label>
+          <label><input type="checkbox" checked={showPoints} onChange={(event) => setShowPoints(event.target.checked)} /> Узлы / границы</label>
+        </div>
+        <div className="length-filter">
+          <p className="panel-label">Длина, м</p>
+          <div><input inputMode="decimal" value={minimumInput} onChange={(event) => setMinimumInput(event.target.value)} placeholder="от" aria-label="Минимальная длина" /><span>—</span><input inputMode="decimal" value={maximumInput} onChange={(event) => setMaximumInput(event.target.value)} placeholder="до" aria-label="Максимальная длина" /><button onClick={applyFilters}>Применить</button></div>
+          {filterError && <p className="inline-error">{filterError}</p>}
+        </div>
+        {error && <div className="map-error"><strong>Viewport не загружен</strong><span>{error}</span></div>}
+        <div className="stats-grid">
+          <Stat label="Сегменты" value={formatInteger(statistics.segmentsTotal)} />
+          <Stat label="Всего" value={formatDistance(statistics.totalLengthMeters)} />
+          <Stat label="Медиана" value={`${formatNumber(statistics.medianLengthMeters)} м`} />
+          <Stat label="P95" value={`${formatNumber(statistics.p95LengthMeters)} м`} />
+        </div>
+        <div className="diagnostics"><span>&lt; 5 м <b>{statistics.shortSegmentCount}</b></span><span>&gt; 500 м <b>{statistics.longSegmentCount}</b></span></div>
+      </aside>
+
+      <aside className={`inspector panel ${selectedID ? 'inspector--open' : ''}`} aria-live="polite">
+        <div className="inspector-handle" />
+        <div className="panel-heading">
+          <div><p className="panel-label">Инспектор</p><h2>{selected?.street?.name ?? (selectedID ? 'Сегмент' : 'Выберите линию')}</h2></div>
+          {selectedID && <button className="icon-button" onClick={() => { setSelectedID(null); setSelected(null) }} aria-label="Закрыть инспектор">×</button>}
+        </div>
+        {!selectedID && <p className="empty-message">Нажмите на цветную линию, чтобы увидеть классификацию и нормализованные атрибуты.</p>}
+        {detailLoading && <p className="empty-message">Загружаем детали…</p>}
+        {selected && !detailLoading && <>
+          <div className="segment-summary">
+            <span style={{ color: classificationColors[selected.classification] }}>{classificationLabels[selected.classification]}</span>
+            <strong>{formatNumber(selected.lengthMeters)} м</strong>
           </div>
-          <div>
-            <dt>Карта</dt>
-            <dd>MapLibre GL JS</dd>
-          </div>
-          <div>
-            <dt>Данные</dt>
-            <dd>Ожидают импорта</dd>
-          </div>
-        </dl>
+          <dl className="detail-list">
+            <Detail label="Причина" value={selected.reasonCode} />
+            <Detail label="Версия" value={`${selected.versionStatus}${selected.isCurrent ? ' · current' : ''}`} />
+            <Detail label="Нормализация" value={selected.normalizationVersion} />
+            <Detail label="ID" value={selected.id} code />
+          </dl>
+          <p className="panel-label attributes-title">Нормализованные атрибуты</p>
+          {attributes.length === 0 ? <p className="empty-message compact">Нет дополнительных атрибутов</p> : <dl className="attribute-list">{attributes.map(([key, value]) => <Detail key={key} label={key} value={formatAttribute(value)} code />)}</dl>}
+          <label className="debug-toggle"><input type="checkbox" checked={showDebug} onChange={(event) => { setDetailLoading(true); setShowDebug(event.target.checked) }} /> Показать OSM debug metadata</label>
+          {showDebug && selected.debugSource && <pre className="debug-json">{JSON.stringify(selected.debugSource, null, 2)}</pre>}
+        </>}
       </aside>
     </main>
   )
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return <div><span>{label}</span><strong>{value}</strong></div>
+}
+
+function Detail({ label, value, code = false }: { label: string; value: string; code?: boolean }) {
+  return <div><dt>{label}</dt><dd className={code ? 'code-value' : ''}>{value}</dd></div>
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(value)
+}
+
+function formatInteger(value: number): string {
+  return new Intl.NumberFormat('ru-RU').format(value)
+}
+
+function formatDistance(meters: number): string {
+  return meters >= 1000 ? `${formatNumber(meters / 1000)} км` : `${formatNumber(meters)} м`
+}
+
+function formatAttribute(value: unknown): string {
+  return typeof value === 'string' ? value : JSON.stringify(value)
 }

@@ -24,6 +24,10 @@ OSM parser types are isolated in `internal/platform/osm`; raw OSM entities are n
 
 - `GET /health/live` checks that the API process is alive.
 - `GET /health/ready` checks that PostgreSQL is reachable and PostGIS is enabled.
+- `GET /api/v1/cities/{cityId}/geo-version` returns the current `READY` version.
+- `GET /api/v1/geo/segments` returns filtered GeoJSON for a bounded viewport with statistics.
+- `GET /api/v1/geo/segments/{segmentId}` returns current or historical segment details; source OSM
+  metadata requires `debug=true` and is disabled in production.
 - `cmd/geo-import` verifies the fixture checksum, builds segments in memory and atomically publishes
   them with a version.
 
@@ -34,6 +38,7 @@ cmd/api/                 API executable
 cmd/geo-import/          offline OSM import executable
 internal/geo/            geo domain and import application boundary
 internal/geo/segmenting/ WalkabilityProfile and topology-based segmentation
+internal/geo/querying/    bounded read use cases and viewport statistics
 internal/config/         environment configuration
 internal/platform/       infrastructure adapters
 internal/transport/      HTTP transport
@@ -111,11 +116,12 @@ For the committed fixture and `max_segment_length_m=0`, the Stage 1.3 baseline i
 
 ## Limitations and technical debt
 
-Raw OSM entities remain only in PBF and temporary import memory. Stage 1.3 does not expose segments
-through the bbox API or Geo Playground yet; that starts in Stage 1.4. `Street.street_id` remains
-nullable and pedestrian areas/indoor corridors are not converted into explorable linear geometry.
-The PBF parser runs with `CGO_ENABLED=0`; performance is measured before changing parser or enabling
-native zlib.
+Raw OSM entities remain only in PBF and temporary import memory. The bbox endpoint rejects viewports
+larger than 25 km² and more than 10,000 matching features instead of truncating them. Districts,
+route generation and coverage are intentionally deferred until the Stage 1.4 visualization is
+evaluated. `Street.street_id` remains nullable and pedestrian areas/indoor corridors are not
+converted into explorable linear geometry. The PBF parser runs with `CGO_ENABLED=0`; performance is
+measured before changing parser or enabling native zlib.
 
 ## Related documents
 
@@ -123,3 +129,4 @@ native zlib.
 - [`Architecture contract`](../docs/stage%201/architecture-contract.md)
 - [`ADR-0001`](../docs/adr/0001-osm-import-foundation.md)
 - [`ADR-0002`](../docs/adr/0002-street-segment-topology-and-walkability.md)
+- [`ADR-0003`](../docs/adr/0003-geo-playground-bbox-api.md)

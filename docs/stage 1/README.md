@@ -84,3 +84,15 @@ Stage 1.4 добавит bbox API и визуальную проверку ре�
 
 Полный контракт реализации и критерии пересмотра находятся в
 [`ADR-0002`](../adr/0002-street-segment-topology-and-walkability.md).
+
+### Stage 1.4a — Bbox API + base segment visualization
+
+Согласованный scope:
+
+- current geo version, bbox GeoJSON и segment detail API;
+- viewport loading с hard area/feature limits;
+- classification layers, segment boundaries, length filters, statistics и inspector;
+- responsive desktop/mobile debug UI.
+
+District data/API, sample routes, coverage и routing engines явно отложены до оценки базовой
+segment network. Контракт зафиксирован в [`ADR-0003`](../adr/0003-geo-playground-bbox-api.md).

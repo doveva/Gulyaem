@@ -8,6 +8,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/doveva/Gulyaem/backend/internal/geo/querying"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -21,6 +22,7 @@ type Dependencies struct {
 	Logger         *slog.Logger
 	Environment    string
 	AllowedOrigins []string
+	Geo            *querying.Service
 }
 
 func NewHandler(deps Dependencies) http.Handler {
@@ -47,6 +49,7 @@ func NewHandler(deps Dependencies) http.Handler {
 		}
 		writeJSON(response, http.StatusOK, map[string]string{"status": "ready"})
 	})
+	registerGeoRoutes(router, deps)
 
 	return router
 }
