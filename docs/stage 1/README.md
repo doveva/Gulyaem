@@ -15,6 +15,8 @@
 
 Принятые решения Stage 1.2 зафиксированы в
 [`ADR-0001`](../adr/0001-osm-import-foundation.md).
+Начальные topology, segmentation и WalkabilityProfile для Stage 1.3 зафиксированы в
+[`ADR-0002`](../adr/0002-street-segment-topology-and-walkability.md).
 
 ## Ожидаемый результат
 
@@ -55,3 +57,30 @@ walkability, bbox API и web playground для визуальной провер
 Согласованные границы и критерии пересмотра parser зафиксированы в
 [`ADR-0001`](../adr/0001-osm-import-foundation.md). Raw OSM entities остаются в PBF;
 `StreetSegment` начинается на Stage 1.3.
+
+### Stage 1.3 — Topology + StreetSegment
+
+Реализовано:
+
+- in-memory processing без raw OSM tables;
+- topology-based segmentation и bbox clipping;
+- ненаправленный `StreetSegment` с отдельными future routing constraints;
+- initial `WalkabilityProfile` с inspectable reason codes;
+- атомарная публикация segments вместе с `GeoDataVersion`;
+- отключённый по умолчанию экспериментальный `max_segment_length_m`;
+- diagnostic thresholds, duplicate policy и обязательный набор synthetic graph tests.
+
+Baseline `spb-dense-center` для `stage1-segments-v1`:
+
+- 6 558 segments всего;
+- 2 649 `EXPLORE`, 2 338 `ROUTABLE_ONLY`, 1 571 `IGNORE`;
+- 0 invalid geometries и 0 zero-length segments;
+- 149 941,43 m общей и 74 928,10 m explorable длины;
+- published extent точно совпадает с fixture bbox;
+- повторный import возвращает ту же `READY` version.
+
+PostgreSQL хранит только domain segments и metadata; raw OSM nodes/ways/relations остаются в PBF.
+Stage 1.4 добавит bbox API и визуальную проверку результата в Geo Playground.
+
+Полный контракт реализации и критерии пересмотра находятся в
+[`ADR-0002`](../adr/0002-street-segment-topology-and-walkability.md).

@@ -33,6 +33,7 @@ _Этот блок сформирован автоматически. Не ре�
 ### `docs/adr/`
 
 - [ADR-0001: Основа импорта OSM для Stage 1](docs/adr/0001-osm-import-foundation.md)
+- [ADR-0002: Начальная topology и WalkabilityProfile для StreetSegment](docs/adr/0002-street-segment-topology-and-walkability.md)
 - [ADR-NNNN: Краткое название решения](docs/adr/adr-template.md)
 - [Architecture Decision Records](docs/adr/README.md)
 

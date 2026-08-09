@@ -15,6 +15,6 @@ var (
 
 type VersionStore interface {
 	BeginImport(context.Context, domain.BeginImport) (domain.BeginImportResult, error)
-	CompleteImport(context.Context, string, *time.Time, domain.ImportReport) (domain.GeoDataVersion, error)
+	CompleteImport(context.Context, string, *time.Time, domain.ImportReport, []domain.StreetSegmentDraft) (domain.GeoDataVersion, error)
 	FailImport(context.Context, string, domain.ImportReport, error) error
 }

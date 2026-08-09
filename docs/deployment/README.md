@@ -62,7 +62,8 @@ make frontend
 Playground будет доступен на `http://localhost:5173/debug/geo`.
 
 `make geo-import` читает committed `spb-dense-center.osm.pbf`. Повторный запуск является
-идемпотентным и не требует сети. Container-вариант той же операции:
+идемпотентным и не требует сети. Импорт строит `StreetSegment` в памяти и публикует их вместе с
+новой `GeoDataVersion` одной транзакцией. Container-вариант той же операции:
 
 ```bash
 docker compose run --rm geo-import
@@ -98,6 +99,15 @@ Frontend-переменные `VITE_*` встраиваются во время 
 
 `GEO_TEST_AREA` по умолчанию равен `spb-dense-center`. `NORMALIZATION_VERSION` входит в identity
 версии вместе с checksum: после изменения normalization rules его значение обязательно меняется.
+Stage 1.3 использует `stage1-segments-v1`. Если локальный `.env` был создан на Stage 1.2 и всё ещё
+содержит `stage1-v1`, обновите его либо выполните:
+
+```bash
+make geo-import NORMALIZATION_VERSION=stage1-segments-v1
+```
+
+`MAX_SEGMENT_LENGTH_M=0` отключает artificial length splitting. Положительное значение оставлено
+только для контролируемых экспериментов.
 
 ## Миграции
 

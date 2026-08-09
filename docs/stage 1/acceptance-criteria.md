@@ -6,18 +6,18 @@
 - [x] AC-02 Import creates `GeoDataVersion`.
 - [x] AC-03 Failed import never becomes `READY`.
 - [x] AC-04 Source checksum/version metadata is retained.
-- [ ] AC-05 Raw OSM IDs are not `StreetSegment` domain identity.
+- [x] AC-05 Raw OSM IDs are not `StreetSegment` domain identity.
 
 ## StreetSegment model
 
-- [ ] AC-06 Own StreetSegments are generated.
-- [ ] AC-07 Every published segment has valid geometry.
-- [ ] AC-08 Every published segment has `length_m > 0`.
-- [ ] AC-09 Every published segment belongs to a `GeoDataVersion`.
-- [ ] AC-10 Every published segment has classification.
-- [ ] AC-11 `EXPLORE`, `ROUTABLE_ONLY`, `IGNORE` are supported.
+- [x] AC-06 Own StreetSegments are generated.
+- [x] AC-07 Every published segment has valid geometry.
+- [x] AC-08 Every published segment has `length_m > 0`.
+- [x] AC-09 Every published segment belongs to a `GeoDataVersion`.
+- [x] AC-10 Every published segment has classification.
+- [x] AC-11 `EXPLORE`, `ROUTABLE_ONLY`, `IGNORE` are supported.
 - [ ] AC-12 Classification reason is inspectable in debug mode.
-- [ ] AC-13 Primary segmentation follows topology, not fixed-length slicing.
+- [x] AC-13 Primary segmentation follows topology, not fixed-length slicing.
 
 ## API
 
@@ -66,18 +66,18 @@
 
 ## Testing
 
-- [ ] AC-44 classification unit tests exist.
-- [ ] AC-45 segmentation synthetic-graph tests exist.
-- [ ] AC-46 PostGIS integration tests exist.
-- [ ] AC-47 fixture invariants exist.
+- [x] AC-44 classification unit tests exist.
+- [x] AC-45 segmentation synthetic-graph tests exist.
+- [x] AC-46 PostGIS integration tests exist.
+- [x] AC-47 fixture invariants exist.
 - [ ] AC-48 frontend interaction tests cover core debug flow.
 - [ ] AC-49 manual visual validation completed for all areas.
 
 ## Stage-result decisions
 
-- [ ] AC-50 topology split rules documented.
-- [ ] AC-51 `max_segment_length_m` selected or explicitly rejected.
-- [ ] AC-52 initial WalkabilityProfile documented.
+- [x] AC-50 topology split rules documented.
+- [x] AC-51 `max_segment_length_m` selected or explicitly rejected.
+- [x] AC-52 initial WalkabilityProfile documented.
 - [ ] AC-53 initial coverage parameters documented, or blocker explicitly recorded.
 - [ ] AC-54 partial-coverage decision documented.
 - [ ] AC-55 bbox + GeoJSON confirmed for Stage 2 or replacement justified.

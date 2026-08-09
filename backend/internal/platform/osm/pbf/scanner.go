@@ -33,6 +33,12 @@ func (source *Scanner) Scan(ctx context.Context, path string, visitor importing.
 		return importing.SourceMetadata{}, fmt.Errorf("read PBF header: %w", err)
 	}
 	metadata := importing.SourceMetadata{}
+	if header.Bounds != nil {
+		metadata.BBox = &importing.BBox{
+			West: header.Bounds.MinLon, South: header.Bounds.MinLat,
+			East: header.Bounds.MaxLon, North: header.Bounds.MaxLat,
+		}
+	}
 	if !header.ReplicationTimestamp.IsZero() {
 		timestamp := header.ReplicationTimestamp
 		metadata.Timestamp = &timestamp

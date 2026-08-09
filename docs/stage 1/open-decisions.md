@@ -6,6 +6,10 @@ Coding agents should keep these points configurable/replaceable when practical.
 
 ## OD-01 WalkabilityProfile mapping
 
+**Initial Stage 1.3 decision:** Accepted in
+[`ADR-0002`](../adr/0002-street-segment-topology-and-walkability.md). The mapping remains subject
+to visual validation before Stage 1 freeze.
+
 Need evidence-based OSM → internal classification mapping.
 
 Questions:
@@ -25,6 +29,10 @@ Expected result: ADR/update with explicit rules and exceptions.
 
 ## OD-02 Maximum segment length
 
+**Initial Stage 1.3 decision:** `max_segment_length_m=0` by default; a positive configurable value
+is supported only as an experiment. Diagnostic thresholds are `< 5 m` and `> 500 m`. See
+[`ADR-0002`](../adr/0002-street-segment-topology-and-walkability.md).
+
 Options include:
 
 ```text
@@ -37,9 +45,17 @@ Do not hardcode a product value before visual validation.
 
 ## OD-03 Additional artificial split points
 
+**Initial Stage 1.3 decision:** no arbitrary points by default. Bbox clipping and an explicitly
+enabled maximum length are the only artificial splits until visual evidence requires more. See
+[`ADR-0002`](../adr/0002-street-segment-topology-and-walkability.md).
+
 Need to determine whether topology-only segments are sometimes too long or semantically coarse.
 
 ## OD-04 Street normalization depth
+
+**Initial Stage 1.3 decision:** create the persistence boundary but leave `street_id` nullable and
+do not populate `Street` by automatic name normalization yet. See
+[`ADR-0002`](../adr/0002-street-segment-topology-and-walkability.md).
 
 Determine how much `Street` normalization is needed now versus later.
 

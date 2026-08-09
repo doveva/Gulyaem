@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/doveva/Gulyaem/backend/internal/geo/domain"
+	"github.com/doveva/Gulyaem/backend/internal/geo/segmenting"
 )
 
 const maximumErrorLength = 4000
@@ -29,7 +31,9 @@ type ImportRequest struct {
 	Source               string
 	SourceURL            string
 	SourceTimestamp      *time.Time
+	BBox                 *BBox
 	NormalizationVersion string
+	MaxSegmentLength     float64
 }
 
 type ImportResult struct {
@@ -68,9 +72,10 @@ func (service *Service) Import(ctx context.Context, request ImportRequest) (Impo
 		return ImportResult{Version: begin.Version, Outcome: "already_ready"}, nil
 	}
 
-	visitor := &countingVisitor{}
+	visitor := &collectingVisitor{}
+	segmentReport := segmenting.Report{}
 	fail := func(importError error) (ImportResult, error) {
-		report := visitor.report("failed", service.now().Sub(startedAt))
+		report := visitor.report("failed", segmentReport, service.now().Sub(startedAt))
 		if failError := service.store.FailImport(ctx, begin.Version.ID, report, importError); failError != nil {
 			return ImportResult{}, errors.Join(importError, failError)
 		}
@@ -92,11 +97,29 @@ func (service *Service) Import(ctx context.Context, request ImportRequest) (Impo
 	if sourceTimestamp == nil {
 		sourceTimestamp = request.SourceTimestamp
 	}
-
-	report := visitor.report("imported", service.now().Sub(startedAt))
-	version, err := service.store.CompleteImport(ctx, begin.Version.ID, sourceTimestamp, report)
+	bbox := request.BBox
+	if bbox == nil {
+		bbox = metadata.BBox
+	}
+	segmentInput := visitor.segmentInput(request.MaxSegmentLength)
+	if bbox != nil {
+		segmentInput.BBox = &segmenting.BBox{
+			West: bbox.West, South: bbox.South, East: bbox.East, North: bbox.North,
+		}
+	}
+	segmentResult, err := segmenting.Build(segmentInput)
 	if err != nil {
-		return ImportResult{}, err
+		return fail(fmt.Errorf("generate street segments: %w", err))
+	}
+	segmentReport = segmentResult.Report
+	if bbox == nil {
+		segmentReport.Warnings = append(segmentReport.Warnings, "missing_source_bbox")
+	}
+
+	report := visitor.report("imported", segmentReport, service.now().Sub(startedAt))
+	version, err := service.store.CompleteImport(ctx, begin.Version.ID, sourceTimestamp, report, segmentResult.Segments)
+	if err != nil {
+		return fail(fmt.Errorf("publish geo import: %w", err))
 	}
 	return ImportResult{Version: version, Outcome: "imported"}, nil
 }
@@ -111,6 +134,8 @@ func validateRequest(request ImportRequest) error {
 		return errors.New("source is required")
 	case strings.TrimSpace(request.NormalizationVersion) == "":
 		return errors.New("normalization version is required")
+	case request.MaxSegmentLength < 0 || math.IsNaN(request.MaxSegmentLength) || math.IsInf(request.MaxSegmentLength, 0):
+		return errors.New("max segment length must be finite and non-negative")
 	default:
 		return nil
 	}
@@ -141,34 +166,76 @@ func truncateError(message string) string {
 	return message[:maximumErrorLength]
 }
 
-type countingVisitor struct {
-	nodes     int64
-	ways      int64
-	relations int64
+type collectingVisitor struct {
+	nodes           int64
+	ways            int64
+	relations       int64
+	segmentingNodes []segmenting.Node
+	segmentingWays  []segmenting.Way
 }
 
-func (visitor *countingVisitor) VisitNode(SourceNode) error {
+func (visitor *collectingVisitor) VisitNode(node SourceNode) error {
 	visitor.nodes++
+	visitor.segmentingNodes = append(visitor.segmentingNodes, segmenting.Node{
+		SourceID: node.SourceID,
+		Point:    domain.Point{Lon: node.Lon, Lat: node.Lat},
+		Tags:     node.Tags,
+	})
 	return nil
 }
 
-func (visitor *countingVisitor) VisitWay(SourceWay) error {
+func (visitor *collectingVisitor) VisitWay(way SourceWay) error {
 	visitor.ways++
+	visitor.segmentingWays = append(visitor.segmentingWays, segmenting.Way{
+		SourceID: way.SourceID,
+		NodeIDs:  way.NodeIDs,
+		Tags:     way.Tags,
+	})
 	return nil
 }
 
-func (visitor *countingVisitor) VisitRelation(SourceRelation) error {
+func (visitor *collectingVisitor) VisitRelation(SourceRelation) error {
 	visitor.relations++
 	return nil
 }
 
-func (visitor *countingVisitor) report(outcome string, duration time.Duration) domain.ImportReport {
+func (visitor *collectingVisitor) segmentInput(maximumLength float64) segmenting.Input {
+	return segmenting.Input{
+		Nodes:            visitor.segmentingNodes,
+		Ways:             visitor.segmentingWays,
+		MaxSegmentLength: maximumLength,
+	}
+}
+
+func (visitor *collectingVisitor) report(outcome string, segments segmenting.Report, duration time.Duration) domain.ImportReport {
 	return domain.ImportReport{
-		Outcome:            outcome,
-		NodesProcessed:     visitor.nodes,
-		WaysProcessed:      visitor.ways,
-		RelationsProcessed: visitor.relations,
-		ObjectsProcessed:   visitor.nodes + visitor.ways + visitor.relations,
-		DurationMillis:     duration.Milliseconds(),
+		Outcome:                      outcome,
+		NodesProcessed:               visitor.nodes,
+		WaysProcessed:                visitor.ways,
+		RelationsProcessed:           visitor.relations,
+		ObjectsProcessed:             visitor.nodes + visitor.ways + visitor.relations,
+		CandidateWays:                segments.CandidateWays,
+		UnsupportedPedestrianAreas:   segments.UnsupportedPedestrianAreas,
+		SegmentsGenerated:            segments.SegmentsGenerated,
+		SegmentsRejected:             segments.SegmentsRejected,
+		SegmentsClipped:              segments.SegmentsClipped,
+		SegmentsDeduplicated:         segments.SegmentsDeduplicated,
+		DuplicateGeometry:            segments.DuplicateGeometry,
+		ConflictingDuplicateGeometry: segments.ConflictingDuplicateGeometry,
+		InvalidGeometries:            segments.InvalidGeometry,
+		ZeroLengthSegments:           segments.ZeroLengthSegments,
+		ShortSegments:                segments.ShortSegments,
+		LongSegments:                 segments.LongSegments,
+		ExploreSegments:              segments.ExploreSegments,
+		RoutableOnlySegments:         segments.RoutableOnlySegments,
+		IgnoreSegments:               segments.IgnoreSegments,
+		TotalLengthMeters:            segments.TotalLengthMeters,
+		ExplorableLengthMeters:       segments.ExplorableLengthMeters,
+		MinSegmentLengthMeters:       segments.MinLengthMeters,
+		MedianSegmentLengthMeters:    segments.MedianLengthMeters,
+		P95SegmentLengthMeters:       segments.P95LengthMeters,
+		MaxSegmentLengthMeters:       segments.MaxLengthMeters,
+		Warnings:                     segments.Warnings,
+		DurationMillis:               duration.Milliseconds(),
 	}
 }

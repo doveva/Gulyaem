@@ -32,6 +32,7 @@ type SourceRelation struct {
 
 type SourceMetadata struct {
 	Timestamp *time.Time
+	BBox      *BBox
 }
 
 type SourceVisitor interface {

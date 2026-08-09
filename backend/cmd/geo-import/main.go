@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -23,6 +24,7 @@ type options struct {
 	file                 string
 	cityCode             string
 	normalizationVersion string
+	maxSegmentLength     float64
 }
 
 func main() {
@@ -70,6 +72,16 @@ func run(logger *slog.Logger, arguments []string) error {
 		"nodes_processed", result.Version.ImportReport.NodesProcessed,
 		"ways_processed", result.Version.ImportReport.WaysProcessed,
 		"relations_processed", result.Version.ImportReport.RelationsProcessed,
+		"segments_generated", result.Version.ImportReport.SegmentsGenerated,
+		"explore_segments", result.Version.ImportReport.ExploreSegments,
+		"routable_only_segments", result.Version.ImportReport.RoutableOnlySegments,
+		"ignore_segments", result.Version.ImportReport.IgnoreSegments,
+		"total_length_m", result.Version.ImportReport.TotalLengthMeters,
+		"explorable_length_m", result.Version.ImportReport.ExplorableLengthMeters,
+		"short_segments", result.Version.ImportReport.ShortSegments,
+		"long_segments", result.Version.ImportReport.LongSegments,
+		"invalid_geometries", result.Version.ImportReport.InvalidGeometries,
+		"duplicate_geometry", result.Version.ImportReport.DuplicateGeometry,
 		"duration_ms", result.Version.ImportReport.DurationMillis,
 	}
 	if err != nil {
@@ -86,7 +98,12 @@ func parseOptions(arguments []string, defaultFixture string) (options, error) {
 	flags.StringVar(&parsed.fixture, "fixture", defaultFixture, "fixture name below GEO_DATA_PATH/test-areas")
 	flags.StringVar(&parsed.file, "file", "", "explicit .osm.pbf path (takes precedence over --fixture)")
 	flags.StringVar(&parsed.cityCode, "city-code", "spb", "target city code for --file")
-	flags.StringVar(&parsed.normalizationVersion, "normalization-version", envOrDefault("NORMALIZATION_VERSION", "stage1-v1"), "normalization rules version")
+	flags.StringVar(&parsed.normalizationVersion, "normalization-version", envOrDefault("NORMALIZATION_VERSION", "stage1-segments-v1"), "normalization rules version")
+	maximumLength, err := envFloatOrDefault("MAX_SEGMENT_LENGTH_M", 0)
+	if err != nil {
+		return options{}, err
+	}
+	flags.Float64Var(&parsed.maxSegmentLength, "max-segment-length-m", maximumLength, "experimental maximum segment length; 0 disables artificial splitting")
 	if err := flags.Parse(arguments); err != nil {
 		return options{}, err
 	}
@@ -103,6 +120,7 @@ func buildRequest(dataRoot string, parsed options) (importing.ImportRequest, err
 			FilePath:             parsed.file,
 			Source:               "openstreetmap",
 			NormalizationVersion: parsed.normalizationVersion,
+			MaxSegmentLength:     parsed.maxSegmentLength,
 		}, nil
 	}
 	if strings.TrimSpace(parsed.fixture) == "" {
@@ -114,14 +132,31 @@ func buildRequest(dataRoot string, parsed options) (importing.ImportRequest, err
 	}
 	timestamp := fixture.Manifest.Source.RetrievedAt
 	return importing.ImportRequest{
-		CityCode:             fixture.Manifest.CityCode,
-		FilePath:             fixture.FilePath,
-		ExpectedChecksum:     fixture.Manifest.PBF.SHA256,
-		Source:               fixture.Manifest.Source.Name,
-		SourceURL:            fixture.Manifest.Source.URL,
-		SourceTimestamp:      &timestamp,
+		CityCode:         fixture.Manifest.CityCode,
+		FilePath:         fixture.FilePath,
+		ExpectedChecksum: fixture.Manifest.PBF.SHA256,
+		Source:           fixture.Manifest.Source.Name,
+		SourceURL:        fixture.Manifest.Source.URL,
+		SourceTimestamp:  &timestamp,
+		BBox: &importing.BBox{
+			West: fixture.Manifest.BBox.West, South: fixture.Manifest.BBox.South,
+			East: fixture.Manifest.BBox.East, North: fixture.Manifest.BBox.North,
+		},
 		NormalizationVersion: parsed.normalizationVersion,
+		MaxSegmentLength:     parsed.maxSegmentLength,
 	}, nil
+}
+
+func envFloatOrDefault(name string, fallback float64) (float64, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return 0, errors.New(name + " must be a number")
+	}
+	return parsed, nil
 }
 
 func envOrDefault(name, fallback string) string {

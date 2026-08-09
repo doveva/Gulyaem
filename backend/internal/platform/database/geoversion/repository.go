@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/doveva/Gulyaem/backend/internal/geo/domain"
@@ -68,6 +71,7 @@ func (repository *Repository) CompleteImport(
 	versionID string,
 	sourceTimestamp *time.Time,
 	report domain.ImportReport,
+	segments []domain.StreetSegmentDraft,
 ) (domain.GeoDataVersion, error) {
 	reportJSON, err := json.Marshal(report)
 	if err != nil {
@@ -93,6 +97,9 @@ func (repository *Repository) CompleteImport(
 	if status != domain.GeoDataVersionImporting {
 		return domain.GeoDataVersion{}, fmt.Errorf("cannot publish geo data version in status %s", status)
 	}
+	if err := insertStreetSegments(ctx, tx, versionID, cityID, segments); err != nil {
+		return domain.GeoDataVersion{}, err
+	}
 
 	if _, err := tx.Exec(ctx, `
 		UPDATE geo_data_versions
@@ -110,6 +117,112 @@ func (repository *Repository) CompleteImport(
 		return domain.GeoDataVersion{}, fmt.Errorf("commit published geo data version: %w", err)
 	}
 	return version, nil
+}
+
+func insertStreetSegments(ctx context.Context, tx pgx.Tx, versionID, cityID string, segments []domain.StreetSegmentDraft) error {
+	if len(segments) == 0 {
+		return errors.New("publish street segments: generated set is empty")
+	}
+	if _, err := tx.Exec(ctx, `
+		CREATE TEMP TABLE geo_segment_import (
+			geometry_wkt text NOT NULL,
+			length_m double precision NOT NULL,
+			classification text NOT NULL,
+			attributes_json text NOT NULL
+		) ON COMMIT DROP
+	`); err != nil {
+		return fmt.Errorf("create street segment import table: %w", err)
+	}
+
+	rows := make([][]any, 0, len(segments))
+	for index, segment := range segments {
+		if err := validateSegmentDraft(segment); err != nil {
+			return fmt.Errorf("validate street segment %d: %w", index, err)
+		}
+		attributesJSON, err := json.Marshal(segment.Attributes)
+		if err != nil {
+			return fmt.Errorf("encode street segment %d attributes: %w", index, err)
+		}
+		rows = append(rows, []any{
+			lineStringWKT(segment.Geometry),
+			segment.LengthMeters,
+			string(segment.Classification),
+			string(attributesJSON),
+		})
+	}
+
+	copied, err := tx.CopyFrom(
+		ctx,
+		pgx.Identifier{"geo_segment_import"},
+		[]string{"geometry_wkt", "length_m", "classification", "attributes_json"},
+		pgx.CopyFromRows(rows),
+	)
+	if err != nil {
+		return fmt.Errorf("copy street segment import rows: %w", err)
+	}
+	if copied != int64(len(segments)) {
+		return fmt.Errorf("copy street segment import rows: copied %d, want %d", copied, len(segments))
+	}
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO street_segments (
+			city_id, geo_data_version_id, geometry, length_m, classification, attributes
+		)
+		SELECT $1, $2, ST_GeomFromText(geometry_wkt, 4326), length_m,
+		       classification::street_segment_classification, attributes_json::jsonb
+		FROM geo_segment_import
+	`, cityID, versionID); err != nil {
+		return fmt.Errorf("insert street segments: %w", err)
+	}
+
+	var published int64
+	var invalid int64
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*), count(*) FILTER (
+			WHERE ST_IsEmpty(geometry)
+			   OR NOT ST_IsValid(geometry)
+			   OR ST_NPoints(geometry) < 2
+			   OR length_m <= 0
+			   OR ST_Length(geometry::geography) <= 0
+		)
+		FROM street_segments
+		WHERE geo_data_version_id = $1
+	`, versionID).Scan(&published, &invalid); err != nil {
+		return fmt.Errorf("validate published street segments: %w", err)
+	}
+	if published != int64(len(segments)) || invalid != 0 {
+		return fmt.Errorf("validate published street segments: published=%d expected=%d invalid=%d", published, len(segments), invalid)
+	}
+	return nil
+}
+
+func validateSegmentDraft(segment domain.StreetSegmentDraft) error {
+	if len(segment.Geometry) < 2 {
+		return errors.New("geometry must contain at least two points")
+	}
+	if segment.LengthMeters <= 0 || math.IsNaN(segment.LengthMeters) || math.IsInf(segment.LengthMeters, 0) {
+		return errors.New("length must be finite and positive")
+	}
+	switch segment.Classification {
+	case domain.StreetSegmentExplore, domain.StreetSegmentRoutableOnly, domain.StreetSegmentIgnore:
+	default:
+		return fmt.Errorf("unsupported classification %q", segment.Classification)
+	}
+	for _, point := range segment.Geometry {
+		if point.Lon < -180 || point.Lon > 180 || point.Lat < -90 || point.Lat > 90 ||
+			math.IsNaN(point.Lon) || math.IsNaN(point.Lat) || math.IsInf(point.Lon, 0) || math.IsInf(point.Lat, 0) {
+			return errors.New("geometry contains an invalid coordinate")
+		}
+	}
+	return nil
+}
+
+func lineStringWKT(points []domain.Point) string {
+	coordinates := make([]string, len(points))
+	for index, point := range points {
+		coordinates[index] = strconv.FormatFloat(point.Lon, 'f', -1, 64) + " " + strconv.FormatFloat(point.Lat, 'f', -1, 64)
+	}
+	return "LINESTRING(" + strings.Join(coordinates, ",") + ")"
 }
 
 func (repository *Repository) FailImport(ctx context.Context, versionID string, report domain.ImportReport, importError error) error {

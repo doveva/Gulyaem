@@ -18,6 +18,8 @@ type storeStub struct {
 	completed   bool
 	failed      bool
 	report      domain.ImportReport
+	segments    []domain.StreetSegmentDraft
+	completeErr error
 }
 
 func (store *storeStub) BeginImport(_ context.Context, input domain.BeginImport) (domain.BeginImportResult, error) {
@@ -28,9 +30,13 @@ func (store *storeStub) BeginImport(_ context.Context, input domain.BeginImport)
 	return store.beginResult, nil
 }
 
-func (store *storeStub) CompleteImport(_ context.Context, _ string, _ *time.Time, report domain.ImportReport) (domain.GeoDataVersion, error) {
+func (store *storeStub) CompleteImport(_ context.Context, _ string, _ *time.Time, report domain.ImportReport, segments []domain.StreetSegmentDraft) (domain.GeoDataVersion, error) {
 	store.completed = true
 	store.report = report
+	store.segments = segments
+	if store.completeErr != nil {
+		return domain.GeoDataVersion{}, store.completeErr
+	}
 	version := store.beginResult.Version
 	version.Status = domain.GeoDataVersionReady
 	version.SourceChecksum = store.beginInput.SourceChecksum
@@ -54,9 +60,9 @@ func (scanner *scannerStub) Scan(_ context.Context, _ string, visitor SourceVisi
 	if scanner.err != nil {
 		return SourceMetadata{}, scanner.err
 	}
-	_ = visitor.VisitNode(SourceNode{SourceID: 1})
-	_ = visitor.VisitNode(SourceNode{SourceID: 2})
-	_ = visitor.VisitWay(SourceWay{SourceID: 3})
+	_ = visitor.VisitNode(SourceNode{SourceID: 1, Lon: 30.31, Lat: 59.94})
+	_ = visitor.VisitNode(SourceNode{SourceID: 2, Lon: 30.311, Lat: 59.94})
+	_ = visitor.VisitWay(SourceWay{SourceID: 3, NodeIDs: []int64{1, 2}, Tags: map[string]string{"highway": "footway"}})
 	_ = visitor.VisitRelation(SourceRelation{SourceID: 4})
 	timestamp := time.Date(2026, 8, 9, 16, 54, 41, 0, time.UTC)
 	return SourceMetadata{Timestamp: &timestamp}, nil
@@ -83,6 +89,9 @@ func TestServiceImportsAndCountsSourceObjects(t *testing.T) {
 	}
 	if store.report.ObjectsProcessed != 4 || store.report.NodesProcessed != 2 || store.report.WaysProcessed != 1 || store.report.RelationsProcessed != 1 {
 		t.Fatalf("report = %+v", store.report)
+	}
+	if store.report.SegmentsGenerated != 1 || len(store.segments) != 1 || store.segments[0].Classification != domain.StreetSegmentExplore {
+		t.Fatalf("segments not generated: report=%+v segments=%+v", store.report, store.segments)
 	}
 	if len(store.beginInput.SourceChecksum) != 64 || store.beginInput.SourceSizeBytes <= 0 {
 		t.Fatalf("source identity not captured: %+v", store.beginInput)
@@ -150,6 +159,25 @@ func TestServiceMarksScannerErrorFailed(t *testing.T) {
 	})
 	if err == nil || result.Outcome != "failed" || !store.failed || store.completed {
 		t.Fatalf("unexpected scanner failure: result=%+v err=%v store=%+v", result, err, store)
+	}
+}
+
+func TestServiceMarksPublicationErrorFailedWithSegmentReport(t *testing.T) {
+	path := writeSourceFile(t, "valid pbf placeholder")
+	store := &storeStub{completeErr: errors.New("transaction rejected")}
+	service := NewService(store, &scannerStub{})
+
+	result, err := service.Import(context.Background(), ImportRequest{
+		CityCode:             "spb",
+		FilePath:             path,
+		Source:               "openstreetmap",
+		NormalizationVersion: "stage1-segments-v1",
+	})
+	if err == nil || result.Outcome != "failed" || !store.completed || !store.failed {
+		t.Fatalf("unexpected publication failure: result=%+v err=%v store=%+v", result, err, store)
+	}
+	if store.report.SegmentsGenerated != 1 || store.report.Outcome != "failed" {
+		t.Fatalf("failed publication lost segment report: %+v", store.report)
 	}
 }
 

@@ -1,8 +1,8 @@
 # Backend
 
-Go modular-monolith backend for the Gulyaem geo exploration service. The current foundation
-provides the HTTP process, PostgreSQL/PostGIS connectivity and a reproducible OSM PBF import with
-version lifecycle metadata.
+Go modular-monolith backend for the Gulyaem geo exploration service. The current implementation
+provides the HTTP process, PostgreSQL/PostGIS connectivity and a reproducible OSM PBF import that
+builds versioned, classified `StreetSegment` geometry.
 
 ## Responsibility
 
@@ -10,6 +10,7 @@ version lifecycle metadata.
 - own application and geo-domain use cases added during Stage 1;
 - persist data through PostgreSQL/PostGIS;
 - import committed OSM PBF fixtures into an owned `GeoDataVersion` lifecycle;
+- normalize pedestrian semantics and generate topology-based `StreetSegment`;
 - emit structured application logs.
 
 ## Boundaries and dependencies
@@ -23,7 +24,8 @@ OSM parser types are isolated in `internal/platform/osm`; raw OSM entities are n
 
 - `GET /health/live` checks that the API process is alive.
 - `GET /health/ready` checks that PostgreSQL is reachable and PostGIS is enabled.
-- `cmd/geo-import` verifies the fixture checksum, streams PBF objects and publishes a version.
+- `cmd/geo-import` verifies the fixture checksum, builds segments in memory and atomically publishes
+  them with a version.
 
 ## Structure
 
@@ -31,6 +33,7 @@ OSM parser types are isolated in `internal/platform/osm`; raw OSM entities are n
 cmd/api/                 API executable
 cmd/geo-import/          offline OSM import executable
 internal/geo/            geo domain and import application boundary
+internal/geo/segmenting/ WalkabilityProfile and topology-based segmentation
 internal/config/         environment configuration
 internal/platform/       infrastructure adapters
 internal/transport/      HTTP transport
@@ -79,6 +82,17 @@ make geo-import \
   GEO_CITY_CODE=spb
 ```
 
+An existing Stage 1.2 `.env` may still contain `NORMALIZATION_VERSION=stage1-v1`. Change it to
+`stage1-segments-v1`, or pass the new value explicitly, so the segment-producing semantics create a
+new version:
+
+```bash
+make geo-import NORMALIZATION_VERSION=stage1-segments-v1
+```
+
+For the committed fixture and `max_segment_length_m=0`, the Stage 1.3 baseline is 6,558 segments:
+2,649 `EXPLORE`, 2,338 `ROUTABLE_ONLY`, and 1,571 `IGNORE`.
+
 ## Configuration
 
 | Variable | Default | Purpose |
@@ -90,18 +104,22 @@ make geo-import \
 | `GEO_TEST_AREA` | `spb-dense-center` | committed fixture selector |
 | `GEO_IMPORT_FILE` | empty | explicit local PBF for `make geo-import` |
 | `GEO_CITY_CODE` | `spb` | city code used with an explicit PBF |
-| `NORMALIZATION_VERSION` | `stage1-v1` | identity of normalization rules used by import |
+| `NORMALIZATION_VERSION` | `stage1-segments-v1` | identity of normalization rules used by import |
+| `MAX_SEGMENT_LENGTH_M` | `0` | experimental artificial split; `0` disables it |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, or `error` |
 | `CORS_ALLOWED_ORIGINS` | local Vite/Compose origins | comma-separated browser origins |
 
 ## Limitations and technical debt
 
-Stage 1.2 deliberately counts and validates source objects but does not persist raw OSM entities or
-generate `StreetSegment`. Topology and normalization behavior begin in Stage 1.3. The PBF parser
-runs with `CGO_ENABLED=0`; performance is measured before changing parser or enabling native zlib.
+Raw OSM entities remain only in PBF and temporary import memory. Stage 1.3 does not expose segments
+through the bbox API or Geo Playground yet; that starts in Stage 1.4. `Street.street_id` remains
+nullable and pedestrian areas/indoor corridors are not converted into explorable linear geometry.
+The PBF parser runs with `CGO_ENABLED=0`; performance is measured before changing parser or enabling
+native zlib.
 
 ## Related documents
 
 - [`Stage 1 requirements`](../docs/stage%201/stage-1-requirements.md)
 - [`Architecture contract`](../docs/stage%201/architecture-contract.md)
 - [`ADR-0001`](../docs/adr/0001-osm-import-foundation.md)
+- [`ADR-0002`](../docs/adr/0002-street-segment-topology-and-walkability.md)

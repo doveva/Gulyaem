@@ -31,7 +31,7 @@ func TestRepositoryLifecycleAgainstPostGIS(t *testing.T) {
 
 	repository := New(db)
 	first := beginTestImport(t, ctx, repository, cityCode, strings.Repeat("a", 64), "integration-v1")
-	firstReady, err := repository.CompleteImport(ctx, first.Version.ID, nil, domain.ImportReport{Outcome: "imported", ObjectsProcessed: 10})
+	firstReady, err := repository.CompleteImport(ctx, first.Version.ID, nil, domain.ImportReport{Outcome: "imported", ObjectsProcessed: 10}, testSegments(1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestRepositoryLifecycleAgainstPostGIS(t *testing.T) {
 	}
 
 	second := beginTestImport(t, ctx, repository, cityCode, strings.Repeat("b", 64), "integration-v2")
-	secondReady, err := repository.CompleteImport(ctx, second.Version.ID, nil, domain.ImportReport{Outcome: "imported", ObjectsProcessed: 11})
+	secondReady, err := repository.CompleteImport(ctx, second.Version.ID, nil, domain.ImportReport{Outcome: "imported", ObjectsProcessed: 11}, testSegments(2))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,8 +55,14 @@ func TestRepositoryLifecycleAgainstPostGIS(t *testing.T) {
 	if got := versionStatus(t, ctx, db, secondReady.ID); got != domain.GeoDataVersionReady {
 		t.Fatalf("second status = %s", got)
 	}
+	if got := segmentCount(t, ctx, db, secondReady.ID); got != 2 {
+		t.Fatalf("second segment count = %d", got)
+	}
 
 	failed := beginTestImport(t, ctx, repository, cityCode, strings.Repeat("c", 64), "integration-invalid")
+	if _, err := repository.CompleteImport(ctx, failed.Version.ID, nil, domain.ImportReport{Outcome: "imported"}, nil); err == nil {
+		t.Fatal("empty segment publication unexpectedly succeeded")
+	}
 	if err := repository.FailImport(ctx, failed.Version.ID, domain.ImportReport{Outcome: "failed"}, errors.New("invalid fixture")); err != nil {
 		t.Fatal(err)
 	}
@@ -66,6 +72,29 @@ func TestRepositoryLifecycleAgainstPostGIS(t *testing.T) {
 	if got := versionStatus(t, ctx, db, secondReady.ID); got != domain.GeoDataVersionReady {
 		t.Fatalf("failed import changed current READY status to %s", got)
 	}
+	if got := segmentCount(t, ctx, db, failed.Version.ID); got != 0 {
+		t.Fatalf("failed import left %d segments", got)
+	}
+}
+
+func testSegments(count int) []domain.StreetSegmentDraft {
+	segments := make([]domain.StreetSegmentDraft, 0, count)
+	for index := 0; index < count; index++ {
+		longitude := 30.30 + float64(index)*0.001
+		segments = append(segments, domain.StreetSegmentDraft{
+			Geometry: []domain.Point{
+				{Lon: longitude, Lat: 59.93},
+				{Lon: longitude + 0.0005, Lat: 59.9305},
+			},
+			LengthMeters:   62.0,
+			Classification: domain.StreetSegmentExplore,
+			Attributes: domain.StreetSegmentAttributes{
+				ReasonCode:   "integration_test",
+				SourceWayIDs: []int64{int64(index + 1)},
+			},
+		})
+	}
+	return segments
 }
 
 func beginTestImport(t *testing.T, ctx context.Context, repository *Repository, cityCode, checksum, normalization string) domain.BeginImportResult {
@@ -138,4 +167,18 @@ func versionStatus(t *testing.T, ctx context.Context, db *database.Pool, version
 		t.Fatal(err)
 	}
 	return status
+}
+
+func segmentCount(t *testing.T, ctx context.Context, db *database.Pool, versionID string) int64 {
+	t.Helper()
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var count int64
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM street_segments WHERE geo_data_version_id = $1`, versionID).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	return count
 }
