@@ -18,6 +18,14 @@
 <!-- docs:index:start -->
 _Этот блок сформирован автоматически. Не редактируйте его вручную._
 
+### `backend/`
+
+- [Backend](backend/README.md)
+
+### `data/`
+
+- [Geo data](data/README.md)
+
 ### `docs/adr/`
 
 - [ADR-NNNN: Краткое название решения](docs/adr/adr-template.md)
@@ -65,6 +73,14 @@ _Этот блок сформирован автоматически. Не ре�
 
 - [Технический долг](docs/technical-debt/README.md)
 
+### `frontend/`
+
+- [Frontend](frontend/README.md)
+
+### `infra/postgis/`
+
+- [PostGIS image](infra/postgis/README.md)
+
 ### `scripts/docs/`
 
 - [Инструменты документации](scripts/docs/README.md)
@@ -72,5 +88,32 @@ _Этот блок сформирован автоматически. Не ре�
 
 ## Текущий статус
 
-Проект находится на стадии подготовки Stage 1 — Geo Exploration Playground. Актуальные
-требования и план реализации собраны в [`docs/stage 1/`](docs/stage%201/README.md).
+Реализован фундамент Stage 1.1 — Geo Exploration Playground: Go API, React + TypeScript shell,
+PostgreSQL/PostGIS, миграции, MapLibre и два режима локального запуска. Актуальные требования и
+план реализации собраны в [`docs/stage 1/`](docs/stage%201/README.md).
+
+## Быстрый запуск
+
+Полный стек в Docker Compose:
+
+```bash
+cp .env.example .env
+docker compose up --build -d
+```
+
+После готовности сервисов:
+
+- Geo Playground: `http://localhost:3000/debug/geo`;
+- API readiness: `http://localhost:8080/health/ready`.
+
+Проверить состояние можно командой `docker compose ps`, остановить — `docker compose down`.
+Инструкции для запуска API и frontend на хосте находятся в
+[`docs/deployment/README.md`](docs/deployment/README.md).
+
+## Проверка
+
+После установки зависимостей (`make bootstrap`) запустите:
+
+```bash
+make check
+```

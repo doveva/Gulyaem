@@ -20,3 +20,20 @@ walkability, bbox API и web playground для визуальной провер
 
 После завершения этапа этот README дополняется фактическими результатами, ссылками на ADR,
 отклонениями от плана и зарегистрированным техническим долгом.
+
+## Прогресс реализации
+
+### Stage 1.1 — Foundation bootstrap
+
+Реализовано:
+
+- отдельные Go API и React + TypeScript frontend;
+- PostgreSQL/PostGIS и SQL-миграции через `golang-migrate`;
+- MapLibre Geo Playground на `/debug/geo` с публичным заменяемым стилем;
+- readiness/liveness endpoints и проверка связи frontend → backend → PostGIS;
+- локальный host-mode и полный Docker Compose build/run;
+- базовые автоматические проверки и документация запуска.
+
+Открытые geo-решения OD-01–OD-08 этим bootstrap не фиксируются. OD-09 пока имеет заменяемый
+локальный default OpenFreeMap Liberty без API-ключа; окончательное подтверждение относится к
+визуальной проверке Stage 1.

@@ -1,0 +1,189 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #eaf2ef;
+  background: #111b1c;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  min-width: 320px;
+}
+
+button,
+a {
+  font: inherit;
+}
+
+.playground {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+}
+
+.topbar,
+.debug-panel {
+  position: absolute;
+  z-index: 2;
+  border: 1px solid rgb(223 235 230 / 14%);
+  background: rgb(17 27 28 / 88%);
+  box-shadow: 0 20px 55px rgb(1 8 9 / 24%);
+  backdrop-filter: blur(18px);
+}
+
+.topbar {
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 72px;
+  padding: 14px 18px;
+  border-radius: 16px;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0;
+  font-size: clamp(1.35rem, 3vw, 1.8rem);
+  letter-spacing: -0.04em;
+}
+
+.eyebrow,
+.panel-label {
+  margin-bottom: 4px;
+  color: #a9c2b9;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.api-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #cad9d4;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.api-status span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #e8b85e;
+  box-shadow: 0 0 0 4px rgb(232 184 94 / 14%);
+}
+
+.api-status--ready span {
+  background: #62d09b;
+  box-shadow: 0 0 0 4px rgb(98 208 155 / 14%);
+}
+
+.api-status--unavailable span {
+  background: #ed766f;
+  box-shadow: 0 0 0 4px rgb(237 118 111 / 14%);
+}
+
+.debug-panel {
+  left: 16px;
+  bottom: 16px;
+  width: min(360px, calc(100% - 32px));
+  padding: 20px;
+  border-radius: 18px;
+}
+
+.debug-panel h2 {
+  margin-bottom: 8px;
+  font-size: 1.2rem;
+}
+
+.debug-panel > p:not(.panel-label) {
+  margin-bottom: 20px;
+  color: #b9cbc5;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.debug-panel dl {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+}
+
+.debug-panel dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 9px;
+  border-top: 1px solid rgb(223 235 230 / 10%);
+  font-size: 0.78rem;
+}
+
+.debug-panel dt {
+  color: #80938d;
+}
+
+.debug-panel dd {
+  margin: 0;
+  color: #eaf2ef;
+  text-align: right;
+}
+
+.not-found {
+  display: grid;
+  place-content: center;
+  min-height: 100%;
+  padding: 32px;
+  text-align: center;
+}
+
+.not-found a {
+  color: #62d09b;
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    align-items: flex-start;
+    padding: 13px 15px;
+  }
+
+  .topbar .eyebrow {
+    display: none;
+  }
+
+  .api-status {
+    margin-top: 5px;
+    white-space: normal;
+  }
+
+  .debug-panel {
+    padding: 16px;
+  }
+}

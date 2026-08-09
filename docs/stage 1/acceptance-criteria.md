@@ -31,12 +31,12 @@
 
 ## Frontend playground
 
-- [ ] AC-21 `/debug/geo` renders the base map.
+- [x] AC-21 `/debug/geo` renders the base map.
 - [ ] AC-22 StreetSegments render over the map.
 - [ ] AC-23 each classification can be toggled independently.
 - [ ] AC-24 segment click/tap opens inspector.
 - [ ] AC-25 classification and length filters work.
-- [ ] AC-26 required attribution remains visible.
+- [x] AC-26 required attribution remains visible.
 - [ ] AC-27 viewport loading/error/empty states are handled.
 - [ ] AC-28 debug statistics are visible.
 

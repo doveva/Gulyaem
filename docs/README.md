@@ -27,6 +27,14 @@
 <!-- docs:index:start -->
 _Этот блок сформирован автоматически. Не редактируйте его вручную._
 
+### `backend/`
+
+- [Backend](../backend/README.md)
+
+### `data/`
+
+- [Geo data](../data/README.md)
+
 ### `docs/adr/`
 
 - [ADR-NNNN: Краткое название решения](adr/adr-template.md)
@@ -73,6 +81,14 @@ _Этот блок сформирован автоматически. Не ре�
 ### `docs/technical-debt/`
 
 - [Технический долг](technical-debt/README.md)
+
+### `frontend/`
+
+- [Frontend](../frontend/README.md)
+
+### `infra/postgis/`
+
+- [PostGIS image](../infra/postgis/README.md)
 
 ### `scripts/docs/`
 
