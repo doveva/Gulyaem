@@ -2,10 +2,10 @@
 
 ## Import and versioning
 
-- [ ] AC-01 OSM dataset can be imported by one documented operation.
-- [ ] AC-02 Import creates `GeoDataVersion`.
-- [ ] AC-03 Failed import never becomes `READY`.
-- [ ] AC-04 Source checksum/version metadata is retained.
+- [x] AC-01 OSM dataset can be imported by one documented operation.
+- [x] AC-02 Import creates `GeoDataVersion`.
+- [x] AC-03 Failed import never becomes `READY`.
+- [x] AC-04 Source checksum/version metadata is retained.
 - [ ] AC-05 Raw OSM IDs are not `StreetSegment` domain identity.
 
 ## StreetSegment model

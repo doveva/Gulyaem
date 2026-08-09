@@ -8,18 +8,30 @@ API_PORT ?= 8080
 ENVIRONMENT ?= development
 LOG_LEVEL ?= info
 GEO_DATA_PATH ?= $(CURDIR)/data
-GEO_TEST_AREA ?=
+GEO_TEST_AREA ?= spb-dense-center
+GEO_CITY_CODE ?= spb
+GEO_IMPORT_FILE ?=
+NORMALIZATION_VERSION ?= stage1-v1
 CORS_ALLOWED_ORIGINS ?= http://localhost:5173,http://localhost:3000
 VITE_API_URL ?= http://localhost:$(API_PORT)
 VITE_MAP_STYLE_URL ?= https://tiles.openfreemap.org/styles/liberty
+CGO_ENABLED ?= 0
 
 DATABASE_URL ?= postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable
 HTTP_ADDRESS ?= :$(API_PORT)
 
-export DATABASE_URL HTTP_ADDRESS ENVIRONMENT LOG_LEVEL GEO_DATA_PATH GEO_TEST_AREA
-export CORS_ALLOWED_ORIGINS VITE_API_URL VITE_MAP_STYLE_URL
+ifeq ($(strip $(GEO_TEST_AREA)),)
+GEO_TEST_AREA := spb-dense-center
+endif
 
-.PHONY: bootstrap db-up migrate api frontend up down logs check docs-check
+ifeq ($(strip $(NORMALIZATION_VERSION)),)
+NORMALIZATION_VERSION := stage1-v1
+endif
+
+export DATABASE_URL HTTP_ADDRESS ENVIRONMENT LOG_LEVEL GEO_DATA_PATH GEO_TEST_AREA GEO_CITY_CODE
+export NORMALIZATION_VERSION CORS_ALLOWED_ORIGINS VITE_API_URL VITE_MAP_STYLE_URL CGO_ENABLED
+
+.PHONY: bootstrap db-up migrate geo-import api frontend up down logs check docs-check
 
 bootstrap:
 	cd backend && go mod download
@@ -30,6 +42,13 @@ db-up:
 
 migrate:
 	docker compose run --rm migrate
+
+geo-import:
+	@if [ -n "$(GEO_IMPORT_FILE)" ]; then \
+		cd backend && go run ./cmd/geo-import --file "$(GEO_IMPORT_FILE)" --city-code "$(GEO_CITY_CODE)" --normalization-version "$(NORMALIZATION_VERSION)"; \
+	else \
+		cd backend && go run ./cmd/geo-import --fixture "$(GEO_TEST_AREA)" --normalization-version "$(NORMALIZATION_VERSION)"; \
+	fi
 
 api:
 	cd backend && go run ./cmd/api

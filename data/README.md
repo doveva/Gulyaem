@@ -5,8 +5,8 @@ at `/data` in the API container and exposed to local processes through `GEO_DATA
 
 ## Responsibility
 
-This directory will contain deliberately small, repository-safe test-area artifacts introduced
-in Stage 1.2 and later. Full city extracts and generated databases do not belong in Git.
+This directory contains deliberately small, repository-safe test-area artifacts. Full city
+extracts and generated databases do not belong in Git.
 
 ## Boundaries and dependencies
 
@@ -15,12 +15,11 @@ directory stores inputs and fixture descriptions only.
 
 ## Main scenarios
 
-Stage 1.1 only establishes the mount point. No geo artifact has been selected or committed yet.
+`test-areas/spb-dense-center` is the first immutable OSM PBF snapshot and manifest.
 
 ## Structure
 
-Fixture subdirectories and their provenance/checksums will be documented when the OSM import is
-implemented.
+Each fixture directory owns its PBF, manifest, checksum/provenance and area-specific README.
 
 ## Run and verify
 
@@ -34,8 +33,8 @@ area.
 
 ## Limitations and technical debt
 
-The precise repository policy for binary PBF fixtures is deferred to Stage 1.2, when real fixture
-sizes and provenance are known.
+Only small reviewed PBF snapshots belong in Git. A full city or regional extract must be obtained
+outside the repository and referenced by checksum.
 
 ## Related documents
 

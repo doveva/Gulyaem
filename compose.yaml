@@ -36,6 +36,7 @@ services:
   api:
     build:
       context: ./backend
+    image: gulyaem/backend:stage1
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-gulyaem}:${POSTGRES_PASSWORD:-gulyaem}@db:5432/${POSTGRES_DB:-gulyaem}?sslmode=disable
       HTTP_ADDRESS: :8080
@@ -60,6 +61,33 @@ services:
       retries: 12
       start_period: 5s
     restart: unless-stopped
+
+  geo-import:
+    build:
+      context: ./backend
+    image: gulyaem/backend:stage1
+    entrypoint: ["geo-import"]
+    command:
+      - --fixture
+      - ${GEO_TEST_AREA:-spb-dense-center}
+      - --normalization-version
+      - ${NORMALIZATION_VERSION:-stage1-v1}
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-gulyaem}:${POSTGRES_PASSWORD:-gulyaem}@db:5432/${POSTGRES_DB:-gulyaem}?sslmode=disable
+      HTTP_ADDRESS: :8080
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      GEO_DATA_PATH: /data
+      GEO_TEST_AREA: ${GEO_TEST_AREA:-spb-dense-center}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - ./data:/data:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    profiles: ["tools"]
+    restart: "no"
 
   frontend:
     build:

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -31,6 +32,10 @@ func (p *Pool) Ping(ctx context.Context) error {
 		return fmt.Errorf("query PostGIS version: %w", err)
 	}
 	return nil
+}
+
+func (p *Pool) Begin(ctx context.Context) (pgx.Tx, error) {
+	return p.pool.Begin(ctx)
 }
 
 func (p *Pool) Close() {

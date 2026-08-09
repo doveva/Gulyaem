@@ -35,8 +35,13 @@ _Этот блок сформирован автоматически. Не ре�
 
 - [Geo data](../data/README.md)
 
+### `data/test-areas/spb-dense-center/`
+
+- [Saint Petersburg dense center fixture](../data/test-areas/spb-dense-center/README.md)
+
 ### `docs/adr/`
 
+- [ADR-0001: Основа импорта OSM для Stage 1](adr/0001-osm-import-foundation.md)
 - [ADR-NNNN: Краткое название решения](adr/adr-template.md)
 - [Architecture Decision Records](adr/README.md)
 
@@ -86,6 +91,10 @@ _Этот блок сформирован автоматически. Не ре�
 
 - [Frontend](../frontend/README.md)
 
+### `infra/osmium/`
+
+- [Osmium fixture tool](../infra/osmium/README.md)
+
 ### `infra/postgis/`
 
 - [PostGIS image](../infra/postgis/README.md)
@@ -93,4 +102,8 @@ _Этот блок сформирован автоматически. Не ре�
 ### `scripts/docs/`
 
 - [Инструменты документации](../scripts/docs/README.md)
+
+### `scripts/geo/`
+
+- [Geo fixture tools](../scripts/geo/README.md)
 <!-- docs:index:end -->

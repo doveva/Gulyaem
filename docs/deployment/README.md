@@ -44,6 +44,7 @@ cp .env.example .env
 ```bash
 make db-up
 make migrate
+make geo-import
 ```
 
 В первом терминале запустить API:
@@ -59,6 +60,13 @@ make frontend
 ```
 
 Playground будет доступен на `http://localhost:5173/debug/geo`.
+
+`make geo-import` читает committed `spb-dense-center.osm.pbf`. Повторный запуск является
+идемпотентным и не требует сети. Container-вариант той же операции:
+
+```bash
+docker compose run --rm geo-import
+```
 
 ## Конфигурация
 
@@ -87,6 +95,9 @@ make api DATABASE_URL='postgres://user:password@db.example/gulyaem?sslmode=requi
 Frontend-переменные `VITE_*` встраиваются во время сборки образа. После их изменения frontend
 нужно пересобрать. `VITE_MAP_STYLE_URL` по умолчанию указывает на публичный OpenFreeMap Liberty;
 стиль не является доменным контрактом и заменяется конфигурацией.
+
+`GEO_TEST_AREA` по умолчанию равен `spb-dense-center`. `NORMALIZATION_VERSION` входит в identity
+версии вместе с checksum: после изменения normalization rules его значение обязательно меняется.
 
 ## Миграции
 

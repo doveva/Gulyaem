@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "name": "spb-dense-center",
+  "description": "Dense historic center of Saint Petersburg for Stage 1 import and topology validation.",
+  "cityCode": "spb",
+  "bbox": {
+    "west": 30.3,
+    "south": 59.93,
+    "east": 30.33,
+    "north": 59.945
+  },
+  "source": {
+    "name": "openstreetmap",
+    "url": "https://api.openstreetmap.org/api/0.6/map?bbox=30.3000,59.9300,30.3300,59.9450",
+    "retrievedAt": "2026-08-09T16:54:41Z",
+    "attribution": "© OpenStreetMap contributors, ODbL 1.0 — https://www.openstreetmap.org/copyright"
+  },
+  "pbf": {
+    "file": "spb-dense-center.osm.pbf",
+    "sha256": "4e9428b0b5e5c7a6705cfa10dedc3847704fd9ef7030d30ee5bfd386e1739848"
+  }
+}
