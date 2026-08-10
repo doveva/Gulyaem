@@ -20,6 +20,14 @@ docker compose ps
 Compose собирает нативный AMD64/ARM64 PostGIS-образ поверх официального PostgreSQL 17, выполняет
 миграции один раз, затем запускает API и статический frontend. Playground доступен на
 `http://localhost:3000/debug/geo`, readiness API — на `http://localhost:8080/health/ready`.
+Для нового пустого named volume один раз опубликуйте оба локальных набора:
+
+```bash
+docker compose run --rm geo-import
+docker compose run --rm district-import
+```
+
+Повтор обоих импортов идемпотентен.
 
 Остановить контейнеры:
 
@@ -45,6 +53,7 @@ cp .env.example .env
 make db-up
 make migrate
 make geo-import
+make district-import
 ```
 
 В первом терминале запустить API:
@@ -67,6 +76,7 @@ Playground будет доступен на `http://localhost:5173/debug/geo`.
 
 ```bash
 docker compose run --rm geo-import
+docker compose run --rm district-import
 ```
 
 ## Конфигурация
@@ -110,6 +120,10 @@ make geo-import NORMALIZATION_VERSION=stage1-segments-v1
 `MAX_SEGMENT_LENGTH_M=0` отключает artificial length splitting. Положительное значение оставлено
 только для контролируемых экспериментов.
 
+`DISTRICT_TEST_AREA=spb-administrative-districts` выбирает committed GeoJSON с 18 районами.
+`DISTRICT_NORMALIZATION_VERSION=stage1-districts-v1` входит в identity независимой
+`DistrictDataVersion`. Оба импорта работают без runtime-доступа к сети.
+
 ## Миграции
 
 Миграции находятся в `backend/migrations` и выполняются образом `golang-migrate`:
@@ -141,8 +155,8 @@ make check
 
 Команда запускает Go tests/vet, frontend lint/tests/build и проверки документации.
 
-## Ограничения Stage 1.4a
+## Ограничения Stage 1.4
 
 Production deployment, backup/restore и rollback application-релиза пока не определены. Данные
-этого этапа локальные и воспроизводимые. Районы, генерация маршрутов и coverage намеренно не входят
-в базовую визуализацию; решения по ним принимаются после оценки импортированной топологии.
+этого этапа локальные и воспроизводимые. Районы доступны как независимый слой; генерация маршрутов
+и coverage относятся к Stage 1.5.

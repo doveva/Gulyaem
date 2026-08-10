@@ -80,7 +80,8 @@ Baseline `spb-dense-center` для `stage1-segments-v1`:
 - повторный import возвращает ту же `READY` version.
 
 PostgreSQL хранит только domain segments и metadata; raw OSM nodes/ways/relations остаются в PBF.
-Stage 1.4 добавит bbox API и визуальную проверку результата в Geo Playground.
+Stage 1.4 добавляет bbox API, визуальную проверку результата и независимый слой административных
+районов в Geo Playground.
 
 Полный контракт реализации и критерии пересмотра находятся в
 [`ADR-0002`](../adr/0002-street-segment-topology-and-walkability.md).
@@ -96,3 +97,15 @@ Stage 1.4 добавит bbox API и визуальную проверку ре�
 
 District data/API, sample routes, coverage и routing engines явно отложены до оценки базовой
 segment network. Контракт зафиксирован в [`ADR-0003`](../adr/0003-geo-playground-bbox-api.md).
+
+### Stage 1.4b — versioned administrative districts
+
+После визуальной оценки topology добавлены 18 административных районов Санкт-Петербурга:
+
+- отдельные `DistrictDataVersion` и идемпотентный `district-import`;
+- полные границы в PostGIS и упрощённая display geometry в bbox GeoJSON;
+- spatial `districts[]` в detail сегмента без изменения topology или identity сегментов;
+- fill/outline/labels, независимый toggle и district inspector.
+
+Sample routes и coverage остаются Stage 1.5. Контракт зафиксирован в
+[`ADR-0004`](../adr/0004-versioned-administrative-districts.md).

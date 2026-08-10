@@ -13,6 +13,7 @@ type Config struct {
 	Environment        string
 	GeoDataPath        string
 	GeoTestArea        string
+	DistrictTestArea   string
 	LogLevel           string
 	CORSAllowedOrigins []string
 	ShutdownTimeout    time.Duration
@@ -30,6 +31,7 @@ func Load() (Config, error) {
 		Environment:        envOrDefault("ENVIRONMENT", "development"),
 		GeoDataPath:        envOrDefault("GEO_DATA_PATH", "./data"),
 		GeoTestArea:        strings.TrimSpace(os.Getenv("GEO_TEST_AREA")),
+		DistrictTestArea:   strings.TrimSpace(os.Getenv("DISTRICT_TEST_AREA")),
 		LogLevel:           strings.ToLower(envOrDefault("LOG_LEVEL", "info")),
 		CORSAllowedOrigins: splitCSV(envOrDefault("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000")),
 		ShutdownTimeout:    10 * time.Second,

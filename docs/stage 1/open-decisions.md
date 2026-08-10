@@ -102,6 +102,10 @@ Need to measure whether representative test-area payload/rendering is sufficient
 
 Do not introduce vector tiles solely as speculative optimization.
 
+District display geometry follows the same bbox GeoJSON experiment. Full district geometry remains
+in PostGIS and only the API representation is simplified; see
+[`ADR-0004`](../adr/0004-versioned-administrative-districts.md).
+
 ## OD-09 Base-map style/provider
 
 Must support:

@@ -13,6 +13,9 @@ GEO_CITY_CODE ?= spb
 GEO_IMPORT_FILE ?=
 NORMALIZATION_VERSION ?= stage1-segments-v1
 MAX_SEGMENT_LENGTH_M ?= 0
+DISTRICT_TEST_AREA ?= spb-administrative-districts
+DISTRICT_IMPORT_FILE ?=
+DISTRICT_NORMALIZATION_VERSION ?= stage1-districts-v1
 CORS_ALLOWED_ORIGINS ?= http://localhost:5173,http://localhost:3000
 VITE_API_URL ?= http://localhost:$(API_PORT)
 VITE_MAP_STYLE_URL ?= https://tiles.openfreemap.org/styles/liberty
@@ -33,10 +36,11 @@ ifeq ($(strip $(MAX_SEGMENT_LENGTH_M)),)
 MAX_SEGMENT_LENGTH_M := 0
 endif
 
-export DATABASE_URL HTTP_ADDRESS ENVIRONMENT LOG_LEVEL GEO_DATA_PATH GEO_TEST_AREA GEO_CITY_CODE
+export DATABASE_URL HTTP_ADDRESS ENVIRONMENT LOG_LEVEL GEO_DATA_PATH GEO_TEST_AREA GEO_CITY_CODE DISTRICT_TEST_AREA
 export NORMALIZATION_VERSION MAX_SEGMENT_LENGTH_M CORS_ALLOWED_ORIGINS VITE_API_URL VITE_MAP_STYLE_URL CGO_ENABLED
+export DISTRICT_NORMALIZATION_VERSION
 
-.PHONY: bootstrap db-up migrate geo-import api frontend up down logs check docs-check
+.PHONY: bootstrap db-up migrate geo-import district-import api frontend up down logs check docs-check
 
 bootstrap:
 	cd backend && go mod download
@@ -53,6 +57,13 @@ geo-import:
 		cd backend && go run ./cmd/geo-import --file "$(GEO_IMPORT_FILE)" --city-code "$(GEO_CITY_CODE)" --normalization-version "$(NORMALIZATION_VERSION)" --max-segment-length-m "$(MAX_SEGMENT_LENGTH_M)"; \
 	else \
 		cd backend && go run ./cmd/geo-import --fixture "$(GEO_TEST_AREA)" --normalization-version "$(NORMALIZATION_VERSION)" --max-segment-length-m "$(MAX_SEGMENT_LENGTH_M)"; \
+	fi
+
+district-import:
+	@if [ -n "$(DISTRICT_IMPORT_FILE)" ]; then \
+		cd backend && go run ./cmd/district-import --file "$(DISTRICT_IMPORT_FILE)" --city-code "$(GEO_CITY_CODE)" --normalization-version "$(DISTRICT_NORMALIZATION_VERSION)"; \
+	else \
+		cd backend && go run ./cmd/district-import --fixture "$(DISTRICT_TEST_AREA)" --normalization-version "$(DISTRICT_NORMALIZATION_VERSION)"; \
 	fi
 
 api:

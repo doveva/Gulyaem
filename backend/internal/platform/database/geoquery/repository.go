@@ -127,6 +127,110 @@ func (repository *Repository) Segment(ctx context.Context, segmentID string) (qu
 	return segment, nil
 }
 
+func (repository *Repository) CurrentDistrictVersion(ctx context.Context, cityID string) (querying.DistrictVersion, error) {
+	tx, err := repository.database.Begin(ctx)
+	if err != nil {
+		return querying.DistrictVersion{}, fmt.Errorf("begin current district version query: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var version querying.DistrictVersion
+	err = tx.QueryRow(ctx, `
+		SELECT id, city_id, source, source_timestamp, source_checksum,
+		       normalization_version, status, imported_at
+		FROM district_data_versions
+		WHERE city_id = $1 AND status = 'READY'
+	`, cityID).Scan(
+		&version.ID, &version.CityID, &version.Source, &version.SourceTimestamp,
+		&version.SourceChecksum, &version.NormalizationVersion, &version.Status, &version.ImportedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return querying.DistrictVersion{}, querying.ErrNotFound
+	}
+	if err != nil {
+		return querying.DistrictVersion{}, fmt.Errorf("query current district version: %w", err)
+	}
+	return version, nil
+}
+
+func (repository *Repository) Districts(ctx context.Context, filter querying.DistrictFilter) ([]querying.District, error) {
+	tx, err := repository.database.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin district bbox query: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	rows, err := tx.Query(ctx, `
+		SELECT d.id, d.city_id, d.district_data_version_id, d.external_id,
+		       d.name, d.kind,
+		       ST_AsGeoJSON(ST_SimplifyPreserveTopology(d.boundary, 0.00005)),
+		       ST_AsGeoJSON(d.label_point), d.attributes
+		FROM districts d
+		JOIN district_data_versions ddv ON ddv.id = d.district_data_version_id
+		WHERE d.city_id = $1 AND ddv.status = 'READY'
+		  AND d.boundary && ST_MakeEnvelope($2, $3, $4, $5, 4326)
+		  AND ST_Intersects(d.boundary, ST_MakeEnvelope($2, $3, $4, $5, 4326))
+		ORDER BY d.name
+	`, filter.CityID, filter.BBox.West, filter.BBox.South, filter.BBox.East, filter.BBox.North)
+	if err != nil {
+		return nil, fmt.Errorf("query districts: %w", err)
+	}
+	defer rows.Close()
+	result := make([]querying.District, 0)
+	for rows.Next() {
+		var district querying.District
+		var geometry, label string
+		var attributes []byte
+		if err := rows.Scan(
+			&district.ID, &district.CityID, &district.DistrictDataVersionID,
+			&district.ExternalID, &district.Name, &district.Kind,
+			&geometry, &label, &attributes,
+		); err != nil {
+			return nil, fmt.Errorf("scan district: %w", err)
+		}
+		district.GeometryJSON = json.RawMessage(geometry)
+		district.LabelPointJSON = json.RawMessage(label)
+		if err := json.Unmarshal(attributes, &district.Attributes); err != nil {
+			return nil, fmt.Errorf("decode district attributes: %w", err)
+		}
+		result = append(result, district)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate districts: %w", err)
+	}
+	return result, nil
+}
+
+func (repository *Repository) SegmentDistricts(ctx context.Context, segmentID string) ([]querying.DistrictSummary, error) {
+	tx, err := repository.database.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin segment district query: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	rows, err := tx.Query(ctx, `
+		SELECT d.id, d.district_data_version_id, d.name, d.kind
+		FROM street_segments ss
+		JOIN districts d ON d.city_id = ss.city_id AND ST_Intersects(d.boundary, ss.geometry)
+		JOIN district_data_versions ddv ON ddv.id = d.district_data_version_id AND ddv.status = 'READY'
+		WHERE ss.id = $1
+		ORDER BY d.name
+	`, segmentID)
+	if err != nil {
+		return nil, fmt.Errorf("query segment districts: %w", err)
+	}
+	defer rows.Close()
+	result := make([]querying.DistrictSummary, 0)
+	for rows.Next() {
+		var district querying.DistrictSummary
+		if err := rows.Scan(&district.ID, &district.DistrictDataVersionID, &district.Name, &district.Kind); err != nil {
+			return nil, fmt.Errorf("scan segment district: %w", err)
+		}
+		result = append(result, district)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate segment districts: %w", err)
+	}
+	return result, nil
+}
+
 type rowScanner interface {
 	Scan(...any) error
 }

@@ -90,6 +90,9 @@ segment inspector
 statistics
 ```
 
+Status: completed in Stage 1.4a/1.4b. District data has an independent version lifecycle and does
+not split or own `StreetSegment`; see ADR-0003 and ADR-0004.
+
 Done when:
 
 - engineer can inspect all classifications on map;

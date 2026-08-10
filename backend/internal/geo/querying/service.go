@@ -74,6 +74,47 @@ type Segment struct {
 	VersionStatus        domain.GeoDataVersionStatus
 	NormalizationVersion string
 	IsCurrent            bool
+	Districts            []DistrictSummary
+}
+
+type DistrictVersion struct {
+	ID                   string
+	CityID               string
+	Source               string
+	SourceTimestamp      *time.Time
+	SourceChecksum       string
+	NormalizationVersion string
+	Status               domain.GeoDataVersionStatus
+	ImportedAt           *time.Time
+}
+
+type District struct {
+	ID                    string
+	CityID                string
+	DistrictDataVersionID string
+	ExternalID            string
+	Name                  string
+	Kind                  string
+	GeometryJSON          json.RawMessage
+	LabelPointJSON        json.RawMessage
+	Attributes            map[string]any
+}
+
+type DistrictSummary struct {
+	ID                    string `json:"id"`
+	DistrictDataVersionID string `json:"districtDataVersionId"`
+	Name                  string `json:"name"`
+	Kind                  string `json:"kind"`
+}
+
+type DistrictFilter struct {
+	CityID string
+	BBox   BBox
+}
+
+type DistrictCollection struct {
+	Version   DistrictVersion
+	Districts []District
 }
 
 type Statistics struct {
@@ -101,6 +142,9 @@ type Repository interface {
 	CurrentVersion(context.Context, string) (Version, error)
 	Segments(context.Context, SegmentFilter, int) ([]Segment, error)
 	Segment(context.Context, string) (Segment, error)
+	CurrentDistrictVersion(context.Context, string) (DistrictVersion, error)
+	Districts(context.Context, DistrictFilter) ([]District, error)
+	SegmentDistricts(context.Context, string) ([]DistrictSummary, error)
 }
 
 type Service struct {
@@ -138,7 +182,30 @@ func (service *Service) Segments(ctx context.Context, filter SegmentFilter) (Seg
 }
 
 func (service *Service) Segment(ctx context.Context, segmentID string) (Segment, error) {
-	return service.repository.Segment(ctx, segmentID)
+	segment, err := service.repository.Segment(ctx, segmentID)
+	if err != nil {
+		return Segment{}, err
+	}
+	segment.Districts, err = service.repository.SegmentDistricts(ctx, segmentID)
+	if err != nil {
+		return Segment{}, err
+	}
+	return segment, nil
+}
+
+func (service *Service) Districts(ctx context.Context, filter DistrictFilter) (DistrictCollection, error) {
+	if filter.BBox.AreaSquareKilometers() > MaximumBBoxAreaSquareKilometers {
+		return DistrictCollection{}, ErrBBoxAreaLimit
+	}
+	version, err := service.repository.CurrentDistrictVersion(ctx, filter.CityID)
+	if err != nil {
+		return DistrictCollection{}, err
+	}
+	districts, err := service.repository.Districts(ctx, filter)
+	if err != nil {
+		return DistrictCollection{}, err
+	}
+	return DistrictCollection{Version: version, Districts: districts}, nil
 }
 
 func calculateStatistics(segments []Segment) Statistics {

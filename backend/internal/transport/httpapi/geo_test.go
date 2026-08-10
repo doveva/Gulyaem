@@ -20,10 +20,13 @@ const (
 )
 
 type geoRepositoryStub struct {
-	version  querying.Version
-	segments []querying.Segment
-	segment  querying.Segment
-	filter   querying.SegmentFilter
+	version          querying.Version
+	districtVersion  querying.DistrictVersion
+	segments         []querying.Segment
+	segment          querying.Segment
+	districts        []querying.District
+	segmentDistricts []querying.DistrictSummary
+	filter           querying.SegmentFilter
 }
 
 func (stub *geoRepositoryStub) CurrentVersion(context.Context, string) (querying.Version, error) {
@@ -43,6 +46,21 @@ func (stub *geoRepositoryStub) Segment(context.Context, string) (querying.Segmen
 		return querying.Segment{}, querying.ErrNotFound
 	}
 	return stub.segment, nil
+}
+
+func (stub *geoRepositoryStub) CurrentDistrictVersion(context.Context, string) (querying.DistrictVersion, error) {
+	if stub.districtVersion.ID == "" {
+		return querying.DistrictVersion{}, querying.ErrNotFound
+	}
+	return stub.districtVersion, nil
+}
+
+func (stub *geoRepositoryStub) Districts(context.Context, querying.DistrictFilter) ([]querying.District, error) {
+	return stub.districts, nil
+}
+
+func (stub *geoRepositoryStub) SegmentDistricts(context.Context, string) ([]querying.DistrictSummary, error) {
+	return stub.segmentDistricts, nil
 }
 
 func TestGeoSegmentsReturnsGeoJSONAndPassesFilters(t *testing.T) {
@@ -80,6 +98,34 @@ func TestGeoSegmentsReturnsGeoJSONAndPassesFilters(t *testing.T) {
 	}
 	if repository.filter.MinLength == nil || *repository.filter.MinLength != 5 || repository.filter.MaxLength == nil || *repository.filter.MaxLength != 100 {
 		t.Fatalf("length filter = %+v", repository.filter)
+	}
+}
+
+func TestGeoDistrictsReturnsGeoJSONWithVersionMetadata(t *testing.T) {
+	repository := &geoRepositoryStub{
+		districtVersion: querying.DistrictVersion{
+			ID: testVersionID, CityID: testCityID, Source: "openstreetmap",
+			NormalizationVersion: "stage1-districts-v1", Status: domain.GeoDataVersionReady,
+		},
+		districts: []querying.District{{
+			ID: testSegmentID, CityID: testCityID, DistrictDataVersionID: testVersionID,
+			ExternalID: "relation/1114902", Name: "Центральный район", Kind: "administrative_district",
+			GeometryJSON:   json.RawMessage(`{"type":"Polygon","coordinates":[]}`),
+			LabelPointJSON: json.RawMessage(`{"type":"Point","coordinates":[30.3,59.9]}`),
+		}},
+	}
+	response := httptest.NewRecorder()
+	testGeoHandler(repository, "test").ServeHTTP(response, httptest.NewRequest(http.MethodGet,
+		"/api/v1/geo/districts?cityId="+testCityID+"&bbox=30.30,59.92,30.31,59.93", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
+	}
+	var body districtFeatureCollection
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Features) != 1 || body.Features[0].Properties.Name != "Центральный район" || body.Meta.DistrictDataVersionID != testVersionID {
+		t.Fatalf("body = %+v", body)
 	}
 }
 

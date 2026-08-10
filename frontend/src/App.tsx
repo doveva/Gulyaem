@@ -6,13 +6,18 @@ import {
   CITY_ID,
   CLASSIFICATIONS,
   EMPTY_STATISTICS,
+  districtLabelCollection,
+  districtQuery,
   emptyCollection,
+  emptyDistrictCollection,
   endpointCollection,
   parseLength,
   segmentQuery,
   type APIErrorPayload,
   type AppliedFilters,
   type Classification,
+  type DistrictCollection,
+  type DistrictProperties,
   type GeoVersion,
   type SegmentCollection,
   type SegmentDetail,
@@ -54,6 +59,7 @@ export function App() {
   const [apiState, setApiState] = useState<ApiState>('checking')
   const [version, setVersion] = useState<GeoVersion | null>(null)
   const [collection, setCollection] = useState<SegmentCollection>(emptyCollection)
+  const [districtCollection, setDistrictCollection] = useState<DistrictCollection>(emptyDistrictCollection)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [visibility, setVisibility] = useState<Visibility>({
@@ -62,8 +68,10 @@ export function App() {
     IGNORE: true,
   })
   const visibilityRef = useRef(visibility)
+  const showDistrictsRef = useRef(true)
   const [showBasemap, setShowBasemap] = useState(true)
   const [showPoints, setShowPoints] = useState(true)
+  const [showDistricts, setShowDistricts] = useState(true)
   const [minimumInput, setMinimumInput] = useState('')
   const [maximumInput, setMaximumInput] = useState('')
   const [filterError, setFilterError] = useState<string | null>(null)
@@ -71,6 +79,7 @@ export function App() {
   const filtersRef = useRef(filters)
   const [selectedID, setSelectedID] = useState<string | null>(null)
   const [selected, setSelected] = useState<SegmentDetail | null>(null)
+  const [selectedDistrict, setSelectedDistrict] = useState<DistrictProperties | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [showDebug, setShowDebug] = useState(false)
 
@@ -81,6 +90,10 @@ export function App() {
   useEffect(() => {
     filtersRef.current = filters
   }, [filters])
+
+  useEffect(() => {
+    showDistrictsRef.current = showDistricts
+  }, [showDistricts])
 
   useEffect(() => {
     if (!mapContainer.current || map.current) return
@@ -98,6 +111,7 @@ export function App() {
 
     const clearViewport = () => {
       setCollection(emptyCollection())
+      setDistrictCollection(emptyDistrictCollection())
       setError(null)
       setLoading(false)
     }
@@ -109,7 +123,7 @@ export function App() {
         return
       }
       const classifications = CLASSIFICATIONS.filter((value) => visibilityRef.current[value])
-      if (classifications.length === 0) {
+      if (classifications.length === 0 && !showDistrictsRef.current) {
         viewportAbort.current?.abort()
         clearViewport()
         return
@@ -124,25 +138,31 @@ export function App() {
       const sequence = ++requestSequence.current
       setLoading(true)
       setError(null)
-      fetch(`${apiURL}/api/v1/geo/segments?${segmentQuery(bbox, classifications, filtersRef.current)}`, {
-        signal: controller.signal,
-      })
-        .then(async (response) => {
+      const fetchJSON = async <T,>(url: string): Promise<T> => {
+        const response = await fetch(url, { signal: controller.signal })
           if (!response.ok) {
             const payload = (await response.json().catch(() => ({}))) as APIErrorPayload
             throw new Error(payload.error?.message ?? `API вернул ${response.status}`)
           }
-          return response.json() as Promise<SegmentCollection>
-        })
-        .then((result) => {
+        return response.json() as Promise<T>
+      }
+      const segmentsRequest = classifications.length > 0
+        ? fetchJSON<SegmentCollection>(`${apiURL}/api/v1/geo/segments?${segmentQuery(bbox, classifications, filtersRef.current)}`)
+        : Promise.resolve(emptyCollection())
+      const districtsRequest = showDistrictsRef.current
+        ? fetchJSON<DistrictCollection>(`${apiURL}/api/v1/geo/districts?${districtQuery(bbox)}`)
+        : Promise.resolve(emptyDistrictCollection())
+      Promise.all([segmentsRequest, districtsRequest])
+        .then(([segmentsResult, districtsResult]) => {
           if (sequence !== requestSequence.current) return
-          setCollection(result)
+          setCollection(segmentsResult)
+          setDistrictCollection(districtsResult)
           setLoading(false)
         })
         .catch((cause: unknown) => {
           if (controller.signal.aborted || sequence !== requestSequence.current) return
           setLoading(false)
-          setError(cause instanceof Error ? cause.message : 'Не удалось загрузить сегменты')
+          setError(cause instanceof Error ? cause.message : 'Не удалось загрузить геоданные')
         })
     }
     requestViewportRef.current = requestViewport
@@ -158,16 +178,47 @@ export function App() {
       const id = feature?.properties?.id
       if (typeof id === 'string') {
         setDetailLoading(true)
+        setSelectedDistrict(null)
         setSelectedID(id)
+        return
+      }
+      const district = instance.getLayer('district-fill')
+        ? instance.queryRenderedFeatures(event.point, { layers: ['district-fill'] })[0]
+        : undefined
+      if (district?.properties && typeof district.properties.id === 'string') {
+        setSelectedID(null)
+        setSelected(null)
+        setDetailLoading(false)
+        setSelectedDistrict(district.properties as DistrictProperties)
       }
     }
     const onMouseMove = (event: MapMouseEvent) => {
-      const layers = Object.values(lineLayers).filter((layer) => instance.getLayer(layer))
+      const layers = [...Object.values(lineLayers), 'district-fill'].filter((layer) => instance.getLayer(layer))
       instance.getCanvas().style.cursor = instance.queryRenderedFeatures(event.point, { layers }).length > 0 ? 'pointer' : ''
     }
 
     instance.once('style.load', () => {
       baseLayerIDs.current = (instance.getStyle().layers ?? []).map((layer) => layer.id)
+      instance.addSource('districts', { type: 'geojson', data: emptyDistrictCollection() })
+      instance.addSource('district-labels', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+      instance.addLayer({
+        id: 'district-fill', type: 'fill', source: 'districts',
+        paint: { 'fill-color': '#7ba99b', 'fill-opacity': 0.11 },
+      })
+      instance.addLayer({
+        id: 'district-outline', type: 'line', source: 'districts',
+        paint: { 'line-color': '#a8cabe', 'line-width': ['interpolate', ['linear'], ['zoom'], 13, 1.1, 17, 2], 'line-opacity': 0.62 },
+      })
+      instance.addLayer({
+        id: 'district-selection', type: 'line', source: 'districts',
+        filter: ['==', ['get', 'id'], ''],
+        paint: { 'line-color': '#ffffff', 'line-width': 3, 'line-opacity': 0.9 },
+      })
+      instance.addLayer({
+        id: 'district-labels', type: 'symbol', source: 'district-labels',
+        layout: { 'text-field': ['get', 'name'], 'text-size': 12, 'text-allow-overlap': false },
+        paint: { 'text-color': '#d5e8e1', 'text-halo-color': '#142122', 'text-halo-width': 1.4, 'text-opacity': 0.82 },
+      })
       instance.addSource('segments', { type: 'geojson', data: emptyCollection() })
       for (const classification of CLASSIFICATIONS) {
         instance.addLayer({
@@ -242,6 +293,12 @@ export function App() {
 
   useEffect(() => {
     if (!mapReady || !map.current) return
+    ;(map.current.getSource('districts') as GeoJSONSource).setData(districtCollection)
+    ;(map.current.getSource('district-labels') as GeoJSONSource).setData(districtLabelCollection(districtCollection))
+  }, [districtCollection, mapReady])
+
+  useEffect(() => {
+    if (!mapReady || !map.current) return
     for (const classification of CLASSIFICATIONS) {
       map.current.setLayoutProperty(lineLayers[classification], 'visibility', visibility[classification] ? 'visible' : 'none')
     }
@@ -264,8 +321,21 @@ export function App() {
 
   useEffect(() => {
     if (!mapReady || !map.current) return
+    for (const layerID of ['district-fill', 'district-outline', 'district-selection', 'district-labels']) {
+      map.current.setLayoutProperty(layerID, 'visibility', showDistricts ? 'visible' : 'none')
+    }
+    requestViewportRef.current()
+  }, [showDistricts, mapReady])
+
+  useEffect(() => {
+    if (!mapReady || !map.current) return
     map.current.setFilter('segment-selection', ['==', ['get', 'id'], selectedID ?? ''])
   }, [selectedID, mapReady])
+
+  useEffect(() => {
+    if (!mapReady || !map.current) return
+    map.current.setFilter('district-selection', ['==', ['get', 'id'], selectedDistrict?.id ?? ''])
+  }, [selectedDistrict, mapReady])
 
   useEffect(() => {
     if (!selectedID) return
@@ -352,7 +422,8 @@ export function App() {
         </div>
         <div className="secondary-toggles">
           <label><input type="checkbox" checked={showBasemap} onChange={(event) => setShowBasemap(event.target.checked)} /> Подложка</label>
-          <label><input type="checkbox" checked={showPoints} onChange={(event) => setShowPoints(event.target.checked)} /> Узлы / границы</label>
+          <label><input type="checkbox" checked={showDistricts} onChange={(event) => { setShowDistricts(event.target.checked); if (!event.target.checked) setSelectedDistrict(null) }} /> Районы</label>
+          <label><input type="checkbox" checked={showPoints} onChange={(event) => setShowPoints(event.target.checked)} /> Узлы сегментов</label>
         </div>
         <div className="length-filter">
           <p className="panel-label">Длина, м</p>
@@ -369,14 +440,24 @@ export function App() {
         <div className="diagnostics"><span>&lt; 5 м <b>{statistics.shortSegmentCount}</b></span><span>&gt; 500 м <b>{statistics.longSegmentCount}</b></span></div>
       </aside>
 
-      <aside className={`inspector panel ${selectedID ? 'inspector--open' : ''}`} aria-live="polite">
+      <aside className={`inspector panel ${selectedID || selectedDistrict ? 'inspector--open' : ''}`} aria-live="polite">
         <div className="inspector-handle" />
         <div className="panel-heading">
-          <div><p className="panel-label">Инспектор</p><h2>{selected?.street?.name ?? (selectedID ? 'Сегмент' : 'Выберите линию')}</h2></div>
-          {selectedID && <button className="icon-button" onClick={() => { setSelectedID(null); setSelected(null) }} aria-label="Закрыть инспектор">×</button>}
+          <div><p className="panel-label">Инспектор</p><h2>{selectedDistrict?.name ?? selected?.street?.name ?? (selectedID ? 'Сегмент' : 'Выберите объект')}</h2></div>
+          {(selectedID || selectedDistrict) && <button className="icon-button" onClick={() => { setSelectedID(null); setSelected(null); setSelectedDistrict(null) }} aria-label="Закрыть инспектор">×</button>}
         </div>
-        {!selectedID && <p className="empty-message">Нажмите на цветную линию, чтобы увидеть классификацию и нормализованные атрибуты.</p>}
+        {!selectedID && !selectedDistrict && <p className="empty-message">Нажмите на цветную линию или район, чтобы увидеть детали.</p>}
         {detailLoading && <p className="empty-message">Загружаем детали…</p>}
+        {selectedDistrict && <>
+          <div className="district-summary"><span>Административный район</span></div>
+          <dl className="detail-list">
+            <Detail label="Тип" value={selectedDistrict.kind} />
+            <Detail label="Источник" value={selectedDistrict.source} />
+            <Detail label="Версия" value={selectedDistrict.districtDataVersionId} code />
+            <Detail label="Нормализация" value={selectedDistrict.normalizationVersion} />
+            <Detail label="External ID" value={selectedDistrict.externalId} code />
+          </dl>
+        </>}
         {selected && !detailLoading && <>
           <div className="segment-summary">
             <span style={{ color: classificationColors[selected.classification] }}>{classificationLabels[selected.classification]}</span>
@@ -388,6 +469,8 @@ export function App() {
             <Detail label="Нормализация" value={selected.normalizationVersion} />
             <Detail label="ID" value={selected.id} code />
           </dl>
+          <p className="panel-label attributes-title">Районы</p>
+          {selected.districts.length === 0 ? <p className="empty-message compact">Район не определён</p> : <div className="district-chips">{selected.districts.map((district) => <span key={district.id}>{district.name}</span>)}</div>}
           <p className="panel-label attributes-title">Нормализованные атрибуты</p>
           {attributes.length === 0 ? <p className="empty-message compact">Нет дополнительных атрибутов</p> : <dl className="attribute-list">{attributes.map(([key, value]) => <Detail key={key} label={key} value={formatAttribute(value)} code />)}</dl>}
           <label className="debug-toggle"><input type="checkbox" checked={showDebug} onChange={(event) => { setDetailLoading(true); setShowDebug(event.target.checked) }} /> Показать OSM debug metadata</label>

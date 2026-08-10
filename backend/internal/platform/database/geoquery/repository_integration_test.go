@@ -26,7 +26,7 @@ func TestRepositoryQueriesCurrentViewportAndHistoricalDetailAgainstPostGIS(t *te
 	defer db.Close()
 
 	cityCode := fmt.Sprintf("geoquery-%d", time.Now().UnixNano())
-	cityID, oldVersionID, currentVersionID, oldSegmentID := seedQueryFixture(t, ctx, db, cityCode)
+	cityID, oldVersionID, currentVersionID, districtVersionID, oldSegmentID := seedQueryFixture(t, ctx, db, cityCode)
 	defer deleteQueryFixture(t, ctx, db, cityID)
 
 	repository := New(db)
@@ -59,9 +59,23 @@ func TestRepositoryQueriesCurrentViewportAndHistoricalDetailAgainstPostGIS(t *te
 	if historical.GeoDataVersionID != oldVersionID || historical.IsCurrent || historical.VersionStatus != domain.GeoDataVersionSuperseded {
 		t.Fatalf("historical segment = %+v", historical)
 	}
+	districtVersion, err := repository.CurrentDistrictVersion(ctx, cityID)
+	if err != nil || districtVersion.ID != districtVersionID {
+		t.Fatalf("district version = %+v error = %v", districtVersion, err)
+	}
+	districts, err := repository.Districts(ctx, querying.DistrictFilter{
+		CityID: cityID, BBox: querying.BBox{West: 30.30, South: 59.93, East: 30.31, North: 59.94},
+	})
+	if err != nil || len(districts) != 1 || districts[0].Name != "Integration District" {
+		t.Fatalf("districts = %+v error = %v", districts, err)
+	}
+	segmentDistricts, err := repository.SegmentDistricts(ctx, oldSegmentID)
+	if err != nil || len(segmentDistricts) != 1 || segmentDistricts[0].DistrictDataVersionID != districtVersionID {
+		t.Fatalf("segment districts = %+v error = %v", segmentDistricts, err)
+	}
 }
 
-func seedQueryFixture(t *testing.T, ctx context.Context, db *database.Pool, code string) (cityID, oldVersionID, currentVersionID, oldSegmentID string) {
+func seedQueryFixture(t *testing.T, ctx context.Context, db *database.Pool, code string) (cityID, oldVersionID, currentVersionID, districtVersionID, oldSegmentID string) {
 	t.Helper()
 	tx, err := db.Begin(ctx)
 	if err != nil {
@@ -104,10 +118,30 @@ func seedQueryFixture(t *testing.T, ctx context.Context, db *database.Pool, code
 	oldSegmentID = insertSegment(oldVersionID, "LINESTRING(30.305 59.935,30.306 59.936)", 60, domain.StreetSegmentExplore, "historical")
 	insertSegment(currentVersionID, "LINESTRING(30.305 59.935,30.306 59.936)", 60, domain.StreetSegmentExplore, "integration_explore")
 	insertSegment(currentVersionID, "LINESTRING(30.325 59.94,30.326 59.941)", 80, domain.StreetSegmentIgnore, "outside_bbox")
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO district_data_versions (
+			city_id, source, source_checksum, source_file_name, source_size_bytes,
+			normalization_version, status, import_finished_at, imported_at, import_report
+		) VALUES ($1, 'integration-test', $2, 'districts.geojson', 1, 'district-query-v1', 'READY', now(), now(), '{"outcome":"imported"}')
+		RETURNING id
+	`, cityID, strings.Repeat("c", 64)).Scan(&districtVersionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO districts (
+			city_id, district_data_version_id, external_id, name, kind, boundary, label_point
+		) VALUES (
+			$1, $2, 'relation/1', 'Integration District', 'administrative_district',
+			ST_GeomFromText('MULTIPOLYGON(((30.30 59.93,30.31 59.93,30.31 59.94,30.30 59.94,30.30 59.93)))',4326),
+			ST_GeomFromText('POINT(30.305 59.935)',4326)
+		)
+	`, cityID, districtVersionID); err != nil {
+		t.Fatal(err)
+	}
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
-	return cityID, oldVersionID, currentVersionID, oldSegmentID
+	return cityID, oldVersionID, currentVersionID, districtVersionID, oldSegmentID
 }
 
 func deleteQueryFixture(t *testing.T, ctx context.Context, db *database.Pool, cityID string) {
@@ -120,6 +154,10 @@ func deleteQueryFixture(t *testing.T, ctx context.Context, db *database.Pool, ci
 	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err := tx.Exec(ctx, `DELETE FROM geo_data_versions WHERE city_id = $1`, cityID); err != nil {
 		t.Errorf("delete versions: %v", err)
+		return
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM district_data_versions WHERE city_id = $1`, cityID); err != nil {
+		t.Errorf("delete district versions: %v", err)
 		return
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM cities WHERE id = $1`, cityID); err != nil {

@@ -2,7 +2,8 @@
 
 Go modular-monolith backend for the Gulyaem geo exploration service. The current implementation
 provides the HTTP process, PostgreSQL/PostGIS connectivity and a reproducible OSM PBF import that
-builds versioned, classified `StreetSegment` geometry.
+builds versioned, classified `StreetSegment` geometry and independently versioned administrative
+districts.
 
 ## Responsibility
 
@@ -11,6 +12,7 @@ builds versioned, classified `StreetSegment` geometry.
 - persist data through PostgreSQL/PostGIS;
 - import committed OSM PBF fixtures into an owned `GeoDataVersion` lifecycle;
 - normalize pedestrian semantics and generate topology-based `StreetSegment`;
+- import and publish normalized administrative `District` boundaries;
 - emit structured application logs.
 
 ## Boundaries and dependencies
@@ -28,14 +30,18 @@ OSM parser types are isolated in `internal/platform/osm`; raw OSM entities are n
 - `GET /api/v1/geo/segments` returns filtered GeoJSON for a bounded viewport with statistics.
 - `GET /api/v1/geo/segments/{segmentId}` returns current or historical segment details; source OSM
   metadata requires `debug=true` and is disabled in production.
+- `GET /api/v1/geo/districts` returns the current district layer for a bounded viewport.
 - `cmd/geo-import` verifies the fixture checksum, builds segments in memory and atomically publishes
   them with a version.
+- `cmd/district-import` verifies the GeoJSON fixture and atomically publishes an independent
+  `DistrictDataVersion`.
 
 ## Structure
 
 ```text
 cmd/api/                 API executable
 cmd/geo-import/          offline OSM import executable
+cmd/district-import/     offline administrative district import executable
 internal/geo/            geo domain and import application boundary
 internal/geo/segmenting/ WalkabilityProfile and topology-based segmentation
 internal/geo/querying/    bounded read use cases and viewport statistics
@@ -75,6 +81,7 @@ Import the default committed fixture after migrations:
 
 ```bash
 make geo-import
+make district-import
 ```
 
 The first invocation reports `outcome=imported`; a repeat with the same checksum and normalization
@@ -111,15 +118,17 @@ For the committed fixture and `max_segment_length_m=0`, the Stage 1.3 baseline i
 | `GEO_CITY_CODE` | `spb` | city code used with an explicit PBF |
 | `NORMALIZATION_VERSION` | `stage1-segments-v1` | identity of normalization rules used by import |
 | `MAX_SEGMENT_LENGTH_M` | `0` | experimental artificial split; `0` disables it |
+| `DISTRICT_TEST_AREA` | `spb-administrative-districts` | committed district fixture selector |
+| `DISTRICT_NORMALIZATION_VERSION` | `stage1-districts-v1` | district import identity |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, or `error` |
 | `CORS_ALLOWED_ORIGINS` | local Vite/Compose origins | comma-separated browser origins |
 
 ## Limitations and technical debt
 
-Raw OSM entities remain only in PBF and temporary import memory. The bbox endpoint rejects viewports
-larger than 25 km² and more than 10,000 matching features instead of truncating them. Districts,
-route generation and coverage are intentionally deferred until the Stage 1.4 visualization is
-evaluated. `Street.street_id` remains nullable and pedestrian areas/indoor corridors are not
+Raw OSM entities remain only in PBF and temporary import memory; district source geometry remains
+in the committed GeoJSON fixture. The bbox endpoint rejects viewports larger than 25 km² and more
+than 10,000 matching segments instead of truncating them. Route generation and coverage remain in
+Stage 1.5. `Street.street_id` remains nullable and pedestrian areas/indoor corridors are not
 converted into explorable linear geometry. The PBF parser runs with `CGO_ENABLED=0`; performance is
 measured before changing parser or enabling native zlib.
 
@@ -130,3 +139,4 @@ measured before changing parser or enabling native zlib.
 - [`ADR-0001`](../docs/adr/0001-osm-import-foundation.md)
 - [`ADR-0002`](../docs/adr/0002-street-segment-topology-and-walkability.md)
 - [`ADR-0003`](../docs/adr/0003-geo-playground-bbox-api.md)
+- [`ADR-0004`](../docs/adr/0004-versioned-administrative-districts.md)

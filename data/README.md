@@ -16,10 +16,13 @@ directory stores inputs and fixture descriptions only.
 ## Main scenarios
 
 `test-areas/spb-dense-center` is the first immutable OSM PBF snapshot and manifest.
+`districts/spb-administrative-districts` contains the full boundaries of the 18 Saint Petersburg
+administrative districts as a checksummed GeoJSON fixture.
 
 ## Structure
 
-Each fixture directory owns its PBF, manifest, checksum/provenance and area-specific README.
+Each fixture directory owns its source artifact, manifest, checksum/provenance and area-specific
+README. Street graph fixtures live below `test-areas`; district fixtures live below `districts`.
 
 ## Run and verify
 
@@ -28,8 +31,8 @@ The directory is mounted automatically by `docker compose up`. Host-mode command
 
 ## Configuration
 
-Use `GEO_DATA_PATH` to select a different input root and `GEO_TEST_AREA` to select a future test
-area.
+Use `GEO_DATA_PATH` to select a different input root, `GEO_TEST_AREA` to select a street graph
+fixture and `DISTRICT_TEST_AREA` to select a district fixture.
 
 ## Limitations and technical debt
 

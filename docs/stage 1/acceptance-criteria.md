@@ -16,36 +16,36 @@
 - [x] AC-09 Every published segment belongs to a `GeoDataVersion`.
 - [x] AC-10 Every published segment has classification.
 - [x] AC-11 `EXPLORE`, `ROUTABLE_ONLY`, `IGNORE` are supported.
-- [ ] AC-12 Classification reason is inspectable in debug mode.
+- [x] AC-12 Classification reason is inspectable in debug mode.
 - [x] AC-13 Primary segmentation follows topology, not fixed-length slicing.
 
 ## API
 
-- [ ] AC-14 Current GeoDataVersion endpoint works.
-- [ ] AC-15 bbox StreetSegment API works.
-- [ ] AC-16 segment-detail API works.
-- [ ] AC-17 district API works.
-- [ ] AC-18 segment collection is returned as GeoJSON.
-- [ ] AC-19 excessive bbox is rejected or safely limited.
-- [ ] AC-20 city-wide graph is not fetched by default.
+- [x] AC-14 Current GeoDataVersion endpoint works.
+- [x] AC-15 bbox StreetSegment API works.
+- [x] AC-16 segment-detail API works.
+- [x] AC-17 district API works.
+- [x] AC-18 segment collection is returned as GeoJSON.
+- [x] AC-19 excessive bbox is rejected or safely limited.
+- [x] AC-20 city-wide graph is not fetched by default.
 
 ## Frontend playground
 
 - [x] AC-21 `/debug/geo` renders the base map.
-- [ ] AC-22 StreetSegments render over the map.
-- [ ] AC-23 each classification can be toggled independently.
-- [ ] AC-24 segment click/tap opens inspector.
-- [ ] AC-25 classification and length filters work.
+- [x] AC-22 StreetSegments render over the map.
+- [x] AC-23 each classification can be toggled independently.
+- [x] AC-24 segment click/tap opens inspector.
+- [x] AC-25 classification and length filters work.
 - [x] AC-26 required attribution remains visible.
-- [ ] AC-27 viewport loading/error/empty states are handled.
-- [ ] AC-28 debug statistics are visible.
+- [x] AC-27 viewport loading/error/empty states are handled.
+- [x] AC-28 debug statistics are visible.
 
 ## Validation fixtures
 
 - [ ] AC-29 at least 3 reproducible test areas exist.
 - [ ] AC-30 test areas cover dense center, regular urban, park+residential.
 - [ ] AC-31 at least 3–5 sample walking routes exist.
-- [ ] AC-32 fixtures are stored in repository.
+- [x] AC-32 fixtures are stored in repository.
 
 ## Route/coverage experiments
 

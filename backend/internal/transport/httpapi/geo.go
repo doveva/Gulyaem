@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math"
@@ -81,7 +82,39 @@ type segmentDetailResponse struct {
 	ReasonCode           string                             `json:"reasonCode"`
 	NormalizedAttributes map[string]any                     `json:"normalizedAttributes"`
 	Street               *segmentStreetResponse             `json:"street"`
+	Districts            []querying.DistrictSummary         `json:"districts"`
 	DebugSource          *segmentDebugSource                `json:"debugSource,omitempty"`
+}
+
+type districtFeatureCollection struct {
+	Type     string            `json:"type"`
+	Features []districtFeature `json:"features"`
+	Meta     districtMeta      `json:"meta"`
+}
+
+type districtFeature struct {
+	Type       string             `json:"type"`
+	ID         string             `json:"id"`
+	Geometry   json.RawMessage    `json:"geometry"`
+	Properties districtProperties `json:"properties"`
+}
+
+type districtProperties struct {
+	ID                    string          `json:"id"`
+	DistrictDataVersionID string          `json:"districtDataVersionId"`
+	ExternalID            string          `json:"externalId"`
+	Name                  string          `json:"name"`
+	Kind                  string          `json:"kind"`
+	LabelPoint            json.RawMessage `json:"labelPoint"`
+	Source                string          `json:"source"`
+	SourceTimestamp       *time.Time      `json:"sourceTimestamp"`
+	NormalizationVersion  string          `json:"normalizationVersion"`
+}
+
+type districtMeta struct {
+	DistrictDataVersionID string     `json:"districtDataVersionId"`
+	ReturnedCount         int        `json:"returnedCount"`
+	BBox                  [4]float64 `json:"bbox"`
 }
 
 type segmentStreetResponse struct {
@@ -103,6 +136,48 @@ func registerGeoRoutes(router chi.Router, deps Dependencies) {
 	router.Get("/api/v1/cities/{cityId}/geo-version", currentGeoVersionHandler(deps))
 	router.Get("/api/v1/geo/segments", segmentsHandler(deps))
 	router.Get("/api/v1/geo/segments/{segmentId}", segmentDetailHandler(deps))
+	router.Get("/api/v1/geo/districts", districtsHandler(deps))
+}
+
+func districtsHandler(deps Dependencies) http.HandlerFunc {
+	return func(response http.ResponseWriter, request *http.Request) {
+		query := request.URL.Query()
+		cityID := strings.TrimSpace(query.Get("cityId"))
+		if !uuidPattern.MatchString(cityID) {
+			writeAPIError(response, http.StatusBadRequest, "invalid_query", "cityId must be a UUID")
+			return
+		}
+		bbox, err := parseBBox(query.Get("bbox"))
+		if err != nil {
+			writeAPIError(response, http.StatusBadRequest, "invalid_query", err.Error())
+			return
+		}
+		collection, err := deps.Geo.Districts(request.Context(), querying.DistrictFilter{CityID: cityID, BBox: bbox})
+		if err != nil {
+			handleGeoError(response, deps, err)
+			return
+		}
+		features := make([]districtFeature, len(collection.Districts))
+		for index, district := range collection.Districts {
+			features[index] = districtFeature{
+				Type: "Feature", ID: district.ID, Geometry: district.GeometryJSON,
+				Properties: districtProperties{
+					ID: district.ID, DistrictDataVersionID: district.DistrictDataVersionID,
+					ExternalID: district.ExternalID, Name: district.Name, Kind: district.Kind,
+					LabelPoint: district.LabelPointJSON, Source: collection.Version.Source,
+					SourceTimestamp:      collection.Version.SourceTimestamp,
+					NormalizationVersion: collection.Version.NormalizationVersion,
+				},
+			}
+		}
+		writeJSON(response, http.StatusOK, districtFeatureCollection{
+			Type: "FeatureCollection", Features: features,
+			Meta: districtMeta{
+				DistrictDataVersionID: collection.Version.ID, ReturnedCount: len(features),
+				BBox: [4]float64{bbox.West, bbox.South, bbox.East, bbox.North},
+			},
+		})
+	}
 }
 
 func currentGeoVersionHandler(deps Dependencies) http.HandlerFunc {
@@ -284,6 +359,7 @@ func detailResponse(segment querying.Segment, includeDebug bool) segmentDetailRe
 		LengthMeters: segment.LengthMeters, Classification: segment.Classification,
 		ReasonCode:           segment.Attributes.ReasonCode,
 		NormalizedAttributes: normalizedAttributes(segment.Attributes), Street: street,
+		Districts: segment.Districts,
 	}
 	if includeDebug {
 		response.DebugSource = &segmentDebugSource{
@@ -315,6 +391,8 @@ func normalizedAttributes(attributes domain.StreetSegmentAttributes) map[string]
 
 func handleGeoError(response http.ResponseWriter, deps Dependencies, err error) {
 	switch {
+	case errors.Is(err, context.Canceled):
+		return
 	case errors.Is(err, querying.ErrNotFound):
 		writeAPIError(response, http.StatusNotFound, "not_found", "geo resource was not found")
 	case errors.Is(err, querying.ErrBBoxAreaLimit):

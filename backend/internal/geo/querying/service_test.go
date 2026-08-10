@@ -9,10 +9,12 @@ import (
 )
 
 type repositoryStub struct {
-	version  Version
-	segments []Segment
-	err      error
-	limit    int
+	version         Version
+	districtVersion DistrictVersion
+	segments        []Segment
+	districts       []District
+	err             error
+	limit           int
 }
 
 func (stub *repositoryStub) CurrentVersion(context.Context, string) (Version, error) {
@@ -34,10 +36,35 @@ func (stub *repositoryStub) Segment(context.Context, string) (Segment, error) {
 	return stub.segments[0], nil
 }
 
+func (stub *repositoryStub) CurrentDistrictVersion(context.Context, string) (DistrictVersion, error) {
+	if stub.err != nil {
+		return DistrictVersion{}, stub.err
+	}
+	return stub.districtVersion, nil
+}
+
+func (stub *repositoryStub) Districts(context.Context, DistrictFilter) ([]District, error) {
+	return stub.districts, stub.err
+}
+
+func (stub *repositoryStub) SegmentDistricts(context.Context, string) ([]DistrictSummary, error) {
+	return nil, stub.err
+}
+
 func TestSegmentsRejectsExcessiveBBoxBeforeRepository(t *testing.T) {
 	repository := &repositoryStub{err: errors.New("must not be called")}
 	service := NewService(repository)
 	_, err := service.Segments(context.Background(), SegmentFilter{
+		CityID: "city", BBox: BBox{West: 30, South: 59, East: 31, North: 60},
+	})
+	if !errors.Is(err, ErrBBoxAreaLimit) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestDistrictsRejectsExcessiveBBoxBeforeRepository(t *testing.T) {
+	repository := &repositoryStub{err: errors.New("must not be called")}
+	_, err := NewService(repository).Districts(context.Background(), DistrictFilter{
 		CityID: "city", BBox: BBox{West: 30, South: 59, East: 31, North: 60},
 	})
 	if !errors.Is(err, ErrBBoxAreaLimit) {

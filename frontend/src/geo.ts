@@ -64,11 +64,39 @@ export interface SegmentDetail {
   reasonCode: string
   normalizedAttributes: Record<string, unknown>
   street: { id: string; name: string | null } | null
+  districts: Array<{
+    id: string
+    districtDataVersionId: string
+    name: string
+    kind: string
+  }>
   debugSource?: {
     tags?: Record<string, string>
     wayIds?: number[]
     startNodeId?: number
     endNodeId?: number
+  }
+}
+
+export interface DistrictProperties {
+  id: string
+  districtDataVersionId: string
+  externalId: string
+  name: string
+  kind: string
+  labelPoint: Point
+  source: string
+  sourceTimestamp: string | null
+  normalizationVersion: string
+}
+
+export type DistrictFeature = Feature<Polygon | MultiPolygon, DistrictProperties>
+
+export interface DistrictCollection extends FeatureCollection<Polygon | MultiPolygon, DistrictProperties> {
+  meta: {
+    districtDataVersionId: string
+    returnedCount: number
+    bbox: [number, number, number, number]
   }
 }
 
@@ -109,6 +137,14 @@ export function emptyCollection(): SegmentCollection {
   }
 }
 
+export function emptyDistrictCollection(): DistrictCollection {
+  return {
+    type: 'FeatureCollection',
+    features: [],
+    meta: { districtDataVersionId: '', returnedCount: 0, bbox: [0, 0, 0, 0] },
+  }
+}
+
 export function segmentQuery(
   bbox: [number, number, number, number],
   classifications: Classification[],
@@ -122,6 +158,25 @@ export function segmentQuery(
   if (filters.minLength !== null) query.set('minLength', String(filters.minLength))
   if (filters.maxLength !== null) query.set('maxLength', String(filters.maxLength))
   return query.toString()
+}
+
+export function districtQuery(bbox: [number, number, number, number]): string {
+  return new URLSearchParams({
+    cityId: CITY_ID,
+    bbox: bbox.map((coordinate) => coordinate.toFixed(6)).join(','),
+  }).toString()
+}
+
+export function districtLabelCollection(collection: DistrictCollection): FeatureCollection<Point, DistrictProperties> {
+  return {
+    type: 'FeatureCollection',
+    features: collection.features.map((feature) => ({
+      type: 'Feature',
+      id: feature.id,
+      geometry: feature.properties.labelPoint,
+      properties: feature.properties,
+    })),
+  }
 }
 
 export function endpointCollection(collection: SegmentCollection): FeatureCollection<Point> {
@@ -149,4 +204,4 @@ export function parseLength(value: string): number | null | 'invalid' {
   const parsed = Number(value)
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 'invalid'
 }
-import type { Feature, FeatureCollection, LineString, Point } from 'geojson'
+import type { Feature, FeatureCollection, LineString, MultiPolygon, Point, Polygon } from 'geojson'

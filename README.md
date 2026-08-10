@@ -22,6 +22,10 @@ _Этот блок сформирован автоматически. Не ре�
 
 - [Backend](backend/README.md)
 
+### `data/districts/spb-administrative-districts/`
+
+- [Административные районы Санкт-Петербурга](data/districts/spb-administrative-districts/README.md)
+
 ### `data/`
 
 - [Geo data](data/README.md)
@@ -35,6 +39,7 @@ _Этот блок сформирован автоматически. Не ре�
 - [ADR-0001: Основа импорта OSM для Stage 1](docs/adr/0001-osm-import-foundation.md)
 - [ADR-0002: Начальная topology и WalkabilityProfile для StreetSegment](docs/adr/0002-street-segment-topology-and-walkability.md)
 - [ADR-0003: Bbox API и базовый Geo Playground для StreetSegment](docs/adr/0003-geo-playground-bbox-api.md)
+- [ADR-0004: Версионируемые административные районы для Geo Playground](docs/adr/0004-versioned-administrative-districts.md)
 - [ADR-NNNN: Краткое название решения](docs/adr/adr-template.md)
 - [Architecture Decision Records](docs/adr/README.md)
 
