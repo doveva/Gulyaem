@@ -39,6 +39,10 @@ _Этот блок сформирован автоматически. Не ре�
 
 - [Geo data](../data/README.md)
 
+### `data/routing-spike/spb-stage1/`
+
+- [Stage 1.6 routing fixtures](../data/routing-spike/spb-stage1/README.md)
+
 ### `data/sample-routes/spb-stage1/`
 
 - [Saint Petersburg Stage 1 sample routes](../data/sample-routes/spb-stage1/README.md)
@@ -58,6 +62,7 @@ _Этот блок сформирован автоматически. Не ре�
 - [ADR-0003: Bbox API и базовый Geo Playground для StreetSegment](adr/0003-geo-playground-bbox-api.md)
 - [ADR-0004: Версионируемые административные районы для Geo Playground](adr/0004-versioned-administrative-districts.md)
 - [ADR-0005: Последовательный map matching и радиусное exploration coverage](adr/0005-sample-route-matching-and-radius-coverage.md)
+- [ADR-0006: Valhalla как routing engine для Stage 2](adr/0006-routing-engine-valhalla.md)
 - [ADR-NNNN: Краткое название решения](adr/adr-template.md)
 - [Architecture Decision Records](adr/README.md)
 
@@ -115,6 +120,10 @@ _Этот блок сформирован автоматически. Не ре�
 
 - [PostGIS image](../infra/postgis/README.md)
 
+### `infra/routing/`
+
+- [Routing spike infrastructure](../infra/routing/README.md)
+
 ### `scripts/docs/`
 
 - [Инструменты документации](../scripts/docs/README.md)
@@ -122,4 +131,8 @@ _Этот блок сформирован автоматически. Не ре�
 ### `scripts/geo/`
 
 - [Geo fixture tools](../scripts/geo/README.md)
+
+### `scripts/routing/`
+
+- [Routing spike scripts](../scripts/routing/README.md)
 <!-- docs:index:end -->

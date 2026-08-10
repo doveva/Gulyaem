@@ -74,6 +74,7 @@ type CandidateSegment struct {
 	GeometryJSON        json.RawMessage
 	LengthMeters        float64
 	Classification      domain.StreetSegmentClassification
+	ReasonCode          string
 	Attributes          domain.StreetSegmentAttributes
 	RadiusCoveredMeters float64
 }
@@ -95,6 +96,7 @@ type Score struct {
 type MatchedFragment struct {
 	SegmentID        string                             `json:"segmentId"`
 	Classification   domain.StreetSegmentClassification `json:"classification"`
+	ReasonCode       string                             `json:"reasonCode"`
 	Geometry         json.RawMessage                    `json:"geometry"`
 	RouteStartMeters float64                            `json:"routeStartMeters"`
 	RouteEndMeters   float64                            `json:"routeEndMeters"`

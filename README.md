@@ -30,6 +30,10 @@ _Этот блок сформирован автоматически. Не ре�
 
 - [Geo data](data/README.md)
 
+### `data/routing-spike/spb-stage1/`
+
+- [Stage 1.6 routing fixtures](data/routing-spike/spb-stage1/README.md)
+
 ### `data/sample-routes/spb-stage1/`
 
 - [Saint Petersburg Stage 1 sample routes](data/sample-routes/spb-stage1/README.md)
@@ -49,6 +53,7 @@ _Этот блок сформирован автоматически. Не ре�
 - [ADR-0003: Bbox API и базовый Geo Playground для StreetSegment](docs/adr/0003-geo-playground-bbox-api.md)
 - [ADR-0004: Версионируемые административные районы для Geo Playground](docs/adr/0004-versioned-administrative-districts.md)
 - [ADR-0005: Последовательный map matching и радиусное exploration coverage](docs/adr/0005-sample-route-matching-and-radius-coverage.md)
+- [ADR-0006: Valhalla как routing engine для Stage 2](docs/adr/0006-routing-engine-valhalla.md)
 - [ADR-NNNN: Краткое название решения](docs/adr/adr-template.md)
 - [Architecture Decision Records](docs/adr/README.md)
 
@@ -106,6 +111,10 @@ _Этот блок сформирован автоматически. Не ре�
 
 - [PostGIS image](infra/postgis/README.md)
 
+### `infra/routing/`
+
+- [Routing spike infrastructure](infra/routing/README.md)
+
 ### `scripts/docs/`
 
 - [Инструменты документации](scripts/docs/README.md)
@@ -113,13 +122,19 @@ _Этот блок сформирован автоматически. Не ре�
 ### `scripts/geo/`
 
 - [Geo fixture tools](scripts/geo/README.md)
+
+### `scripts/routing/`
+
+- [Routing spike scripts](scripts/routing/README.md)
 <!-- docs:index:end -->
 
 ## Текущий статус
 
-Реализован фундамент Stage 1.1 — Geo Exploration Playground: Go API, React + TypeScript shell,
-PostgreSQL/PostGIS, миграции, MapLibre и два режима локального запуска. Актуальные требования и
-план реализации собраны в [`docs/stage 1/`](docs/stage%201/README.md).
+Реализованы Stage 1.1–1.6 Geo Exploration Playground: воспроизводимый OSM import,
+`StreetSegment`, районы, sample routes, радиусное coverage и сравнение routing engines. Для Stage 2
+выбрана Valhalla; результаты находятся в
+[`ADR-0006`](docs/adr/0006-routing-engine-valhalla.md). Финальная проверка и freeze параметров
+остаются Stage 1.7.
 
 ## Быстрый запуск
 
@@ -138,6 +153,16 @@ docker compose up --build -d
 Проверить состояние можно командой `docker compose ps`, остановить — `docker compose down`.
 Инструкции для запуска API и frontend на хосте находятся в
 [`docs/deployment/README.md`](docs/deployment/README.md).
+
+Воспроизвести routing-engine spike и обновить статический comparison overlay:
+
+```bash
+make routing-spike
+```
+
+Команда использует Compose profile `routing-spike`; порты и endpoint URLs можно переопределить
+через `.env`. Холодные graphs находятся в `.routing/` и удаляются только явной командой
+`make routing-reset`.
 
 ## Проверка
 

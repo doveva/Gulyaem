@@ -3,6 +3,13 @@ import { GeoJSONSource, Map, NavigationControl, setWorkerUrl, type MapMouseEvent
 import maplibreWorkerURL from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { isGeoPlaygroundPath } from './routing'
 import {
+  ROUTING_ENGINES,
+  comparisonCollection,
+  waypointCollection,
+  type RoutingComparison,
+  type RoutingEngineID,
+} from './routingComparison'
+import {
   coverageCollection,
   matchedCollection,
   normalizedFeature,
@@ -57,6 +64,12 @@ const classificationColors: Record<Classification, string> = {
   IGNORE: '#b77774',
 }
 const coverageLayerIDs = ['coverage-not-covered', 'coverage-partial', 'coverage-completed', 'coverage-connector']
+const routingLayerIDs: Record<RoutingEngineID, string> = {
+  valhalla: 'routing-valhalla', graphhopper: 'routing-graphhopper', osrm: 'routing-osrm',
+}
+const routingColors: Record<RoutingEngineID, string> = {
+  valhalla: '#ff9e64', graphhopper: '#58b9ff', osrm: '#ff6fae',
+}
 
 setWorkerUrl(maplibreWorkerURL)
 
@@ -107,7 +120,17 @@ export function App() {
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
   const [selectedCoverage, setSelectedCoverage] = useState<CoverageFeature['properties'] | null>(null)
+  const [routingComparison, setRoutingComparison] = useState<RoutingComparison | null>(null)
+  const [routingComparisonError, setRoutingComparisonError] = useState<string | null>(null)
+  const [showRoutingComparison, setShowRoutingComparison] = useState(false)
+  const [routingVisibility, setRoutingVisibility] = useState<Record<RoutingEngineID, boolean>>({
+    valhalla: true, graphhopper: true, osrm: true,
+  })
   const selectedRoute = useMemo(() => routes.find((route) => route.id === selectedRouteID) ?? null, [routes, selectedRouteID])
+  const selectedRoutingCase = useMemo(
+    () => routingComparison?.cases.find((routeCase) => routeCase.routeId === selectedRouteID) ?? null,
+    [routingComparison, selectedRouteID],
+  )
 
   useEffect(() => {
     visibilityRef.current = visibility
@@ -275,6 +298,24 @@ export function App() {
         id: 'route-source-line', type: 'line', source: 'route-source',
         paint: { 'line-color': '#b98cff', 'line-width': 3, 'line-dasharray': [2, 1.5], 'line-opacity': 0.8 },
       })
+      instance.addSource('routing-comparison', { type: 'geojson', data: comparisonCollection(null, '') })
+      for (const engine of ROUTING_ENGINES) {
+        instance.addLayer({
+          id: routingLayerIDs[engine], type: 'line', source: 'routing-comparison',
+          filter: ['==', ['get', 'engineId'], engine],
+          layout: { visibility: 'none' },
+          paint: {
+            'line-color': routingColors[engine],
+            'line-width': ['interpolate', ['linear'], ['zoom'], 13, 3, 17, 6],
+            'line-opacity': 0.9,
+          },
+        })
+      }
+      instance.addSource('routing-waypoints', { type: 'geojson', data: waypointCollection(null, '') })
+      instance.addLayer({
+        id: 'routing-waypoints', type: 'circle', source: 'routing-waypoints', layout: { visibility: 'none' },
+        paint: { 'circle-color': '#f6fff9', 'circle-radius': 5, 'circle-stroke-color': '#172526', 'circle-stroke-width': 2 },
+      })
       instance.addSource('route-coverage', { type: 'geojson', data: coverageCollection(null) })
       for (const [id, status, color, opacity] of [
         ['coverage-not-covered', 'NOT_COVERED', '#82908d', 0.42],
@@ -364,6 +405,25 @@ export function App() {
 
   useEffect(() => {
     const controller = new AbortController()
+    fetch('/routing-spike/comparison.json', { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Отчёт Stage 1.6 недоступен (${response.status})`)
+        return response.json() as Promise<RoutingComparison>
+      })
+      .then((result) => {
+        setRoutingComparison(result)
+        setRoutingComparisonError(null)
+      })
+      .catch((cause: unknown) => {
+        if (!controller.signal.aborted) {
+          setRoutingComparisonError(cause instanceof Error ? cause.message : 'Отчёт Stage 1.6 недоступен')
+        }
+      })
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
     fetch(`${apiURL}/api/v1/geo/sample-routes?cityId=${CITY_ID}`, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error(`API вернул ${response.status}`)
@@ -407,6 +467,25 @@ export function App() {
     ;(map.current.getSource('route-unmatched') as GeoJSONSource).setData(unmatchedCollection(analysis))
     ;(map.current.getSource('route-coverage') as GeoJSONSource).setData(coverageCollection(analysis))
   }, [analysis, mapReady])
+
+  useEffect(() => {
+    if (!mapReady || !map.current) return
+    ;(map.current.getSource('routing-comparison') as GeoJSONSource)
+      .setData(comparisonCollection(routingComparison, selectedRouteID))
+    ;(map.current.getSource('routing-waypoints') as GeoJSONSource)
+      .setData(waypointCollection(routingComparison, selectedRouteID))
+  }, [routingComparison, selectedRouteID, mapReady])
+
+  useEffect(() => {
+    if (!mapReady || !map.current) return
+    for (const engine of ROUTING_ENGINES) {
+      map.current.setLayoutProperty(
+        routingLayerIDs[engine], 'visibility',
+        showRoutingComparison && routingVisibility[engine] ? 'visible' : 'none',
+      )
+    }
+    map.current.setLayoutProperty('routing-waypoints', 'visibility', showRoutingComparison ? 'visible' : 'none')
+  }, [showRoutingComparison, routingVisibility, mapReady])
 
   useEffect(() => {
     if (!mapReady || !map.current) return
@@ -546,8 +625,8 @@ export function App() {
       <div ref={mapContainer} className="map" aria-label="Карта сегментов центра Санкт-Петербурга" />
       <header className="topbar">
         <div>
-          <p className="eyebrow">Stage 1.5 · Geo Playground</p>
-          <h1>ГуляЕм <span>/ Matching & Coverage</span></h1>
+          <p className="eyebrow">Stage 1.6 · Geo Playground</p>
+          <h1>ГуляЕм <span>/ Routing comparison</span></h1>
         </div>
         <div className={`api-status api-status--${apiState}`} role="status">
           <span aria-hidden="true" />
@@ -600,6 +679,45 @@ export function App() {
               <Stat label="Unmatched" value={formatDistance(analysis.metrics.routeUnmatchedLengthMeters)} />
             </div>
           </>}
+          <div className="routing-comparison-controls">
+            <label className="routing-master-toggle">
+              <input
+                type="checkbox"
+                checked={showRoutingComparison}
+                disabled={!routingComparison}
+                onChange={(event) => setShowRoutingComparison(event.target.checked)}
+              /> Сравнить routing engines
+            </label>
+            {routingComparisonError && <p className="inline-error">{routingComparisonError}</p>}
+            {showRoutingComparison && selectedRoutingCase && <>
+              <p className="route-description">Waypoints: {selectedRoutingCase.waypoints.length} · corridor {routingComparison?.benchmark.corridorMeters} м</p>
+              <div className="routing-engine-list">
+                {ROUTING_ENGINES.map((engineID) => {
+                  const engine = routingComparison?.engines.find((item) => item.id === engineID)
+                  const result = selectedRoutingCase.results.find((item) => item.engineId === engineID)
+                  return <div className="routing-engine-row" key={engineID}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={routingVisibility[engineID]}
+                        disabled={!result?.geometry}
+                        onChange={() => setRoutingVisibility((current) => ({ ...current, [engineID]: !current[engineID] }))}
+                      />
+                      <i style={{ backgroundColor: routingColors[engineID] }} />
+                      <strong>{engine?.name ?? engineID}</strong>
+                    </label>
+                    {result?.status === 'ok' ? <div className="routing-result-metrics">
+                      <span>{formatDistance(result.distanceMeters ?? 0)}</span>
+                      <span>p50 {formatNumber(result.latency.p50Milliseconds)} мс</span>
+                      <span>corridor {formatNumber((result.corridor.referenceInsideCandidateRatio ?? 0) * 100)}%</span>
+                      <span>segments {formatNumber((result.matcher?.routeMatchedRatio ?? 0) * 100)}%</span>
+                      {(result.matcher?.matchedReasonMeters.service_track ?? 0) > 0 && <span>service/track {formatDistance(result.matcher?.matchedReasonMeters.service_track ?? 0)}</span>}
+                    </div> : <p className="inline-error compact">{result?.error ?? 'Нет результата'}</p>}
+                  </div>
+                })}
+              </div>
+            </>}
+          </div>
         </section>
         <div className="classification-list">
           {CLASSIFICATIONS.map((classification) => (

@@ -58,11 +58,11 @@
 
 ## Routing-engine spike
 
-- [ ] AC-39 Valhalla evaluated or explicit exclusion documented.
-- [ ] AC-40 GraphHopper evaluated or explicit exclusion documented.
-- [ ] AC-41 OSRM evaluated or explicit exclusion documented.
-- [ ] AC-42 routing comparison uses shared fixtures.
-- [ ] AC-43 final routing-engine decision is documented.
+- [x] AC-39 Valhalla evaluated or explicit exclusion documented.
+- [x] AC-40 GraphHopper evaluated or explicit exclusion documented.
+- [x] AC-41 OSRM evaluated or explicit exclusion documented.
+- [x] AC-42 routing comparison uses shared fixtures.
+- [x] AC-43 final routing-engine decision is documented.
 
 ## Testing
 

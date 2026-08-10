@@ -139,5 +139,84 @@ services:
       retries: 12
     restart: unless-stopped
 
+  valhalla:
+    image: ghcr.io/valhalla/valhalla-scripted:3.7.0
+    profiles: ["routing-spike"]
+    environment:
+      build_admins: "False"
+      build_time_zones: "False"
+      build_elevation: "False"
+      build_tar: "True"
+      server_threads: "2"
+      use_tiles_ignore_pbf: "True"
+    ports:
+      - "${VALHALLA_PORT:-8002}:8002"
+    volumes:
+      - ./.routing/valhalla:/custom_files
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8002/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 120
+      start_period: 5s
+    restart: unless-stopped
+
+  graphhopper:
+    build:
+      context: ./infra/routing/graphhopper
+      args:
+        GRAPHHOPPER_VERSION: "11.0"
+    image: gulyaem/graphhopper:11.0
+    profiles: ["routing-spike"]
+    ports:
+      - "${GRAPHHOPPER_PORT:-8989}:8989"
+    volumes:
+      - ./data/test-areas/spb-stage1-validation/spb-stage1-validation.osm.pbf:/data/spb-stage1-validation.osm.pbf:ro
+      - ./.routing/graphhopper:/graph
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8989/info"]
+      interval: 5s
+      timeout: 3s
+      retries: 120
+      start_period: 5s
+    restart: unless-stopped
+
+  osrm-prepare:
+    image: ghcr.io/project-osrm/osrm-backend:v26.7.3-debian
+    profiles: ["routing-spike"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        checksum="$$(sha256sum /data/spb-stage1-validation.osm.pbf | cut -d ' ' -f 1)"
+        if [ ! -f /routing/.prepared-sha256 ] || [ "$$(cat /routing/.prepared-sha256)" != "$$checksum" ]; then
+          find /routing -maxdepth 1 -type f -name 'spb-stage1-validation.osrm*' -delete
+          cp /data/spb-stage1-validation.osm.pbf /routing/spb-stage1-validation.osm.pbf
+          osrm-extract -p /opt/foot.lua /routing/spb-stage1-validation.osm.pbf
+          osrm-partition /routing/spb-stage1-validation.osrm
+          osrm-customize /routing/spb-stage1-validation.osrm
+          printf '%s' "$$checksum" > /routing/.prepared-sha256
+        fi
+        if [ -r /sys/fs/cgroup/memory.peak ]; then
+          cat /sys/fs/cgroup/memory.peak > /routing/.prepare-peak-memory-bytes
+        fi
+    volumes:
+      - ./data/test-areas/spb-stage1-validation/spb-stage1-validation.osm.pbf:/data/spb-stage1-validation.osm.pbf:ro
+      - ./.routing/osrm:/routing
+    restart: "no"
+
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:v26.7.3-debian
+    profiles: ["routing-spike"]
+    command: ["osrm-routed", "--algorithm", "mld", "/routing/spb-stage1-validation.osrm"]
+    ports:
+      - "${OSRM_PORT:-5001}:5000"
+    volumes:
+      - ./.routing/osrm:/routing:ro
+    depends_on:
+      osrm-prepare:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
 volumes:
   postgres-data:

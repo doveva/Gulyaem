@@ -86,6 +86,12 @@ Decide whether MVP needs cumulative partial coverage or whether binary completio
 
 ## OD-07 Routing engine
 
+**Stage 1.6 decision:** Accepted in
+[`ADR-0006`](../adr/0006-routing-engine-valhalla.md). Valhalla is selected for Stage 2 because it
+gave the strongest route corridor result and the only consistently plausible map matching across
+both shared scenarios. OSRM remains a performance baseline/fallback; GraphHopper leaves the active
+shortlist for now.
+
 Candidates:
 
 ```text

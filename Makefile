@@ -20,6 +20,12 @@ CORS_ALLOWED_ORIGINS ?= http://localhost:5173,http://localhost:3000
 VITE_API_URL ?= http://localhost:$(API_PORT)
 VITE_MAP_STYLE_URL ?= https://tiles.openfreemap.org/styles/liberty
 CGO_ENABLED ?= 0
+VALHALLA_PORT ?= 8002
+GRAPHHOPPER_PORT ?= 8989
+OSRM_PORT ?= 5001
+VALHALLA_URL ?= http://localhost:$(VALHALLA_PORT)
+GRAPHHOPPER_URL ?= http://localhost:$(GRAPHHOPPER_PORT)
+OSRM_URL ?= http://localhost:$(OSRM_PORT)
 
 DATABASE_URL ?= postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable
 HTTP_ADDRESS ?= :$(API_PORT)
@@ -39,8 +45,10 @@ endif
 export DATABASE_URL HTTP_ADDRESS ENVIRONMENT LOG_LEVEL GEO_DATA_PATH GEO_TEST_AREA GEO_CITY_CODE DISTRICT_TEST_AREA
 export NORMALIZATION_VERSION MAX_SEGMENT_LENGTH_M CORS_ALLOWED_ORIGINS VITE_API_URL VITE_MAP_STYLE_URL CGO_ENABLED
 export DISTRICT_NORMALIZATION_VERSION
+export VALHALLA_PORT GRAPHHOPPER_PORT OSRM_PORT VALHALLA_URL GRAPHHOPPER_URL OSRM_URL
 
-.PHONY: bootstrap db-up migrate geo-import district-import api frontend up down logs check docs-check
+.PHONY: bootstrap db-up migrate geo-import district-import api frontend up down logs check docs-check \
+	routing-prepare routing-images routing-up routing-benchmark routing-down routing-reset routing-spike
 
 bootstrap:
 	cd backend && go mod download
@@ -90,3 +98,27 @@ check:
 docs-check:
 	python3 scripts/docs/docs.py index --check
 	python3 scripts/docs/docs.py check
+
+routing-prepare:
+	./scripts/routing/prepare.sh
+
+routing-images:
+	docker compose --profile routing-spike pull valhalla osrm osrm-prepare
+	docker compose --profile routing-spike build graphhopper
+
+routing-up: routing-images routing-prepare
+	./scripts/routing/up.sh
+
+routing-benchmark:
+	cd backend && GOCACHE=$(CURDIR)/.gocache go run ./cmd/routing-spike \
+		--root "$(CURDIR)" \
+		--setup-metrics "$(CURDIR)/.routing/setup-metrics.json" \
+		--output "$(CURDIR)/frontend/public/routing-spike/comparison.json"
+
+routing-down:
+	docker compose --profile routing-spike stop valhalla graphhopper osrm
+
+routing-reset:
+	./scripts/routing/reset.sh
+
+routing-spike: routing-up routing-benchmark

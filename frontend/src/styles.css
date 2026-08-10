@@ -105,6 +105,16 @@ h2 { margin: 0; font-size: 1.04rem; letter-spacing: -.02em; }
 .coverage-legend .not-covered { background: #82908d; }
 .coverage-legend .connector { background: #55aef2; }
 .route-stats { margin-top: 4px; }
+.routing-comparison-controls { margin-top: 12px; padding-top: 11px; border-top: 1px solid rgb(223 235 230 / 9%); }
+.routing-master-toggle { color: #cfe0da; font-size: .7rem; font-weight: 700; cursor: pointer; }
+.routing-master-toggle input, .routing-engine-row input { accent-color: #35d3b4; vertical-align: -2px; }
+.routing-master-toggle input:disabled { opacity: .45; cursor: not-allowed; }
+.routing-engine-list { display: grid; gap: 7px; }
+.routing-engine-row { padding: 8px; border-radius: 9px; background: rgb(255 255 255 / 4%); }
+.routing-engine-row > label { display: flex; align-items: center; gap: 7px; color: #d7e6e1; font-size: .68rem; cursor: pointer; }
+.routing-engine-row i { width: 13px; height: 3px; border-radius: 3px; }
+.routing-result-metrics { display: flex; flex-wrap: wrap; gap: 4px 9px; margin: 6px 0 0 21px; color: #8da39b; font-size: .58rem; font-variant-numeric: tabular-nums; }
+.inline-error.compact { margin: 5px 0 0 21px; font-size: .58rem; }
 
 .classification-list { display: grid; gap: 4px; margin: 16px 0 13px; }
 .layer-toggle {

@@ -25,6 +25,8 @@ administrative districts as a checksummed GeoJSON fixture.
 Each fixture directory owns its source artifact, manifest, checksum/provenance and area-specific
 README. Street graph fixtures live below `test-areas`; district fixtures live below `districts`.
 Curated immutable walking lines used by analysis experiments live below `sample-routes`.
+The shared routing-engine benchmark contract, waypoint selection and pinned engine versions live
+below `routing-spike`; generated graphs do not belong in this directory.
 
 ## Run and verify
 

@@ -2,6 +2,7 @@ package routeanalysis
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -48,6 +49,30 @@ func (service *Service) Analyze(ctx context.Context, cityID, routeID string, req
 	if !found {
 		return Analysis{}, ErrRouteNotFound
 	}
+	return service.analyze(ctx, cityID, route, request)
+}
+
+// AnalyzeGeometry runs the Stage 1 matcher and coverage calculation for a
+// routing-engine result without making engine edge IDs part of the domain.
+func (service *Service) AnalyzeGeometry(
+	ctx context.Context, cityID, routeID string, geometry json.RawMessage, request AnalyzeRequest,
+) (Analysis, error) {
+	var line lineStringGeometry
+	if err := json.Unmarshal(geometry, &line); err != nil || line.Type != "LineString" || len(line.Coordinates) < 2 {
+		return Analysis{}, fmt.Errorf("%w: route geometry must be a GeoJSON LineString", ErrInvalidParameters)
+	}
+	points := make([]domain.Point, len(line.Coordinates))
+	for index, coordinate := range line.Coordinates {
+		if len(coordinate) < 2 || math.IsNaN(coordinate[0]) || math.IsNaN(coordinate[1]) ||
+			math.IsInf(coordinate[0], 0) || math.IsInf(coordinate[1], 0) {
+			return Analysis{}, fmt.Errorf("%w: route geometry contains an invalid coordinate", ErrInvalidParameters)
+		}
+		points[index] = domain.Point{Lon: coordinate[0], Lat: coordinate[1]}
+	}
+	return service.analyze(ctx, cityID, Route{ID: routeID, Geometry: geometry, Points: points}, request)
+}
+
+func (service *Service) analyze(ctx context.Context, cityID string, route Route, request AnalyzeRequest) (Analysis, error) {
 	if err := validateAnalyzeRequest(request); err != nil {
 		return Analysis{}, err
 	}
@@ -262,7 +287,8 @@ func assembleMatchResult(samples []routeSample, matches []sampleMatch, sampleSte
 		count := float64(end - start)
 		matchedFragments = append(matchedFragments, MatchedFragment{
 			SegmentID: matches[start].segment.ID, Classification: matches[start].segment.Classification,
-			Geometry: lineGeometryJSON(projected), RouteStartMeters: samples[start].measure, RouteEndMeters: samples[end-1].measure,
+			ReasonCode: matches[start].segment.ReasonCode,
+			Geometry:   lineGeometryJSON(projected), RouteStartMeters: samples[start].measure, RouteEndMeters: samples[end-1].measure,
 			Score: Score{DistanceScore: distanceScore / count, DirectionScore: directionScore / count,
 				ContinuityScore: continuityScore / count, Confidence: confidence / count, Reason: "MATCHED_SEQUENTIAL"},
 		})

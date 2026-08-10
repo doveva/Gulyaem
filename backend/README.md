@@ -14,6 +14,7 @@ districts.
 - normalize pedestrian semantics and generate topology-based `StreetSegment`;
 - import and publish normalized administrative `District` boundaries;
 - analyze committed sample routes with sequential matching and radius coverage without persistence;
+- run a reproducible routing-engine comparison without importing engine graph identity into the domain;
 - emit structured application logs.
 
 ## Boundaries and dependencies
@@ -39,6 +40,8 @@ OSM parser types are isolated in `internal/platform/osm`; raw OSM entities are n
   them with a version.
 - `cmd/district-import` verifies the GeoJSON fixture and atomically publishes an independent
   `DistrictDataVersion`.
+- `cmd/routing-spike` benchmarks pinned engines and runs returned geometries through the existing
+  `StreetSegment` matcher.
 
 ## Structure
 
@@ -46,10 +49,12 @@ OSM parser types are isolated in `internal/platform/osm`; raw OSM entities are n
 cmd/api/                 API executable
 cmd/geo-import/          offline OSM import executable
 cmd/district-import/     offline administrative district import executable
+cmd/routing-spike/       offline Stage 1.6 engine comparison executable
 internal/geo/            geo domain and import application boundary
 internal/geo/segmenting/ WalkabilityProfile and topology-based segmentation
 internal/geo/querying/    bounded read use cases and viewport statistics
 internal/geo/routeanalysis/ stateless sequential matching and coverage semantics
+internal/routingspike/   engine adapters, benchmark metrics and report generation
 internal/config/         environment configuration
 internal/platform/       infrastructure adapters
 internal/transport/      HTTP transport
@@ -110,6 +115,15 @@ make geo-import NORMALIZATION_VERSION=stage1-segments-v1
 For the committed fixture and `max_segment_length_m=0`, the Stage 1.3 baseline is 6,558 segments:
 2,649 `EXPLORE`, 2,338 `ROUTABLE_ONLY`, and 1,571 `IGNORE`.
 
+Run the Stage 1.6 comparison from the repository root:
+
+```bash
+make routing-spike
+```
+
+This starts the isolated Compose profile, measures relative local setup/resources, runs the same
+route and map-matching fixtures against all engines, and updates the frontend report.
+
 ## Configuration
 
 | Variable | Default | Purpose |
@@ -136,7 +150,8 @@ and more than 10,000 matching segments instead of truncating them. Stage 1.5 rou
 coverage are stateless request-time experiments, not production Walk/progress persistence.
 `Street.street_id` remains nullable and pedestrian areas/indoor corridors are not converted into
 explorable linear geometry. The PBF parser runs with `CGO_ENABLED=0`; performance is measured
-before changing parser or enabling native zlib.
+before changing parser or enabling native zlib. Routing-spike resource measurements are local
+Docker Desktop comparisons, not production sizing.
 
 ## Related documents
 
@@ -147,3 +162,4 @@ before changing parser or enabling native zlib.
 - [`ADR-0003`](../docs/adr/0003-geo-playground-bbox-api.md)
 - [`ADR-0004`](../docs/adr/0004-versioned-administrative-districts.md)
 - [`ADR-0005`](../docs/adr/0005-sample-route-matching-and-radius-coverage.md)
+- [`ADR-0006`](../docs/adr/0006-routing-engine-valhalla.md)

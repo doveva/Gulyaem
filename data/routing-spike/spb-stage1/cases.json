@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "dataset": {
+    "geoFixture": "spb-stage1-validation",
+    "pbfFile": "data/test-areas/spb-stage1-validation/spb-stage1-validation.osm.pbf",
+    "pbfSha256": "05fa864bb753ffc4b2c632deae28e6b6ed80b8e677f65a9689d786596aa0e8ae",
+    "routeFixture": "data/sample-routes/spb-stage1/routes.geojson"
+  },
+  "benchmark": {
+    "warmRequests": 30,
+    "corridorMeters": 20,
+    "sampleStepMeters": 5
+  },
+  "cases": [
+    {
+      "routeId": "nevsky-kazansky-griboyedov",
+      "waypointIndexes": [0, 22, 49],
+      "note": "Старт, смысловой поворот у канала и финиш"
+    },
+    {
+      "routeId": "admiralteyskaya-isaac-moyka",
+      "waypointIndexes": [0, 31, 60],
+      "note": "Адмиралтейская, Исаакиевская площадь и Мойка"
+    },
+    {
+      "routeId": "konyushennaya-capella-moyka",
+      "waypointIndexes": [0, 6, 15, 24],
+      "note": "Проход через Капеллу без передачи движку полной эталонной линии"
+    },
+    {
+      "routeId": "akademicheskaya-grazhdansky",
+      "waypointIndexes": [0, 51, 101],
+      "note": "Две станции метро и одна промежуточная точка городского коридора"
+    },
+    {
+      "routeId": "sosnovka-tikhoretsky-severny",
+      "waypointIndexes": [0, 17, 42, 60],
+      "note": "Вход, две смысловые точки парковой сети и выход"
+    }
+  ],
+  "mapMatchingRouteIds": [
+    "admiralteyskaya-isaac-moyka",
+    "konyushennaya-capella-moyka"
+  ]
+}

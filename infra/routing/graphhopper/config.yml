@@ -1,0 +1,36 @@
+graphhopper:
+  datareader.file: /data/spb-stage1-validation.osm.pbf
+  graph.location: /graph/spb-stage1-validation
+
+  profiles:
+    - name: foot
+      custom_model_files: [foot.json]
+  profiles_ch: []
+  profiles_lm: []
+
+  graph.encoded_values: foot_access, foot_average_speed, road_access, road_class, road_environment, surface, smoothness, track_type, osm_way_id, hike_rating, foot_priority, country, foot_road_access, mtb_rating
+  prepare.min_network_size: 0
+  prepare.subnetworks.threads: 1
+  routing.max_visited_nodes: 1000000
+  routing.timeout_ms: 30000
+  routing.snap_preventions_default: tunnel, bridge, ferry
+  import.osm.ignored_highways: motorway,trunk
+  graph.dataaccess.default_type: RAM_STORE
+
+server:
+  application_connectors:
+    - type: http
+      port: 8989
+      bind_host: 0.0.0.0
+  admin_connectors:
+    - type: http
+      port: 8990
+      bind_host: 0.0.0.0
+  request_log:
+    appenders: []
+
+logging:
+  level: INFO
+  appenders:
+    - type: console
+      time_zone: UTC

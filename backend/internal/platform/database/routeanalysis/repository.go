@@ -36,7 +36,8 @@ func (repository *Repository) CandidateSegments(
 	defer func() { _ = tx.Rollback(ctx) }()
 	rows, err := tx.Query(ctx, `
 		WITH route AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON($2), 4326) AS geometry)
-		SELECT ss.id, ST_AsGeoJSON(ss.geometry), ss.length_m, ss.classification, ss.attributes, 0::double precision
+		SELECT ss.id, ST_AsGeoJSON(ss.geometry), ss.length_m, ss.classification,
+		       ss.attributes, 0::double precision
 		FROM street_segments ss
 		JOIN geo_data_versions gdv ON gdv.id = ss.geo_data_version_id AND gdv.status = 'READY'
 		CROSS JOIN route
@@ -111,6 +112,7 @@ func scanSegments(queryRows pgx.Rows) ([]geoanalysis.CandidateSegment, error) {
 		if err := json.Unmarshal(attributesBytes, &segment.Attributes); err != nil {
 			return nil, fmt.Errorf("decode route analysis attributes: %w", err)
 		}
+		segment.ReasonCode = segment.Attributes.ReasonCode
 		result = append(result, segment)
 	}
 	if err := queryRows.Err(); err != nil {

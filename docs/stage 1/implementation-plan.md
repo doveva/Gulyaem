@@ -149,6 +149,11 @@ Record:
 
 Conclude with ADR decision.
 
+Status: completed. Valhalla, GraphHopper and OSRM were run against the same checksum-pinned PBF,
+five route cases and two map-matching cases. Valhalla is selected for Stage 2; OSRM remains the
+performance baseline/fallback. Results and limitations are recorded in
+[`ADR-0006`](../adr/0006-routing-engine-valhalla.md).
+
 ---
 
 ## Stage 1.7 — Validation and freeze

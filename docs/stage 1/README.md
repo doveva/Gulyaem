@@ -118,3 +118,16 @@ Playground сравнивает Strict/Balanced/Generous/custom profiles и от
 normalized, unmatched, connectors, partial и completed network. Результаты не сохраняются и не
 образуют production Walk/progress domain. Контракт зафиксирован в
 [`ADR-0005`](../adr/0005-sample-route-matching-and-radius-coverage.md).
+
+### Stage 1.6 — routing engine comparison
+
+Valhalla 3.7.0, GraphHopper 11.0 и OSRM 26.7.3 запущены в одинаковом Compose profile на одном
+checksum-pinned PBF. Пять общих route cases сравниваются по геометрии, latency, размеру ответа и
+совместимости с `StreetSegment`; два route fixtures дополнительно проходят engine map matching.
+Runner записывает machine-readable report, а Playground показывает три геометрии и общие
+waypoints поверх reference route.
+
+Все движки построили 5/5 маршрутов. Valhalla выбрана для Stage 2 благодаря лучшему среднему
+corridor overlap и устойчивому map matching на обычной и неоднозначной трассе. OSRM остаётся
+быстрым baseline/fallback. Контракт, числа и ограничения зафиксированы в
+[`ADR-0006`](../adr/0006-routing-engine-valhalla.md).

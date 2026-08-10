@@ -52,6 +52,7 @@ export interface RouteAnalysis {
   matchedFragments: Array<{
     segmentId: string
     classification: 'EXPLORE' | 'ROUTABLE_ONLY'
+    reasonCode: string
     geometry: LineString
     routeStartMeters: number
     routeEndMeters: number

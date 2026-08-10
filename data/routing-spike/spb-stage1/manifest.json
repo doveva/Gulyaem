@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "name": "spb-stage1-routing-spike",
+  "description": "Shared waypoint and trace cases for the Stage 1.6 routing-engine comparison",
+  "cityCode": "spb",
+  "cases": {
+    "file": "cases.json",
+    "sha256": "76a6c03cf38aeb29ee76dc14bcf7938c74b519fcb644e4d0f571a8db81488b97"
+  },
+  "engines": {
+    "valhalla": "3.7.0",
+    "graphhopper": "11.0",
+    "osrm": "26.7.3"
+  }
+}
