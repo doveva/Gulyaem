@@ -111,11 +111,13 @@ partial coverage
 Концептуальная формула:
 
 ```text
-required =
-clamp(
-    segment.length * coverage_ratio,
-    min_required_m,
-    max_required_m
+required = min(
+    segment.length,
+    clamp(
+        segment.length * coverage_ratio,
+        min_required_m,
+        max_required_m
+    )
 )
 ```
 

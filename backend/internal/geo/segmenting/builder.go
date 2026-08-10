@@ -33,6 +33,11 @@ func Build(input Input) (Result, error) {
 	if input.BBox != nil && !input.BBox.Valid() {
 		return Result{}, errors.New("invalid import bbox")
 	}
+	for _, bbox := range input.BBoxes {
+		if !bbox.Valid() {
+			return Result{}, errors.New("invalid import bbox")
+		}
+	}
 	if input.MaxSegmentLength < 0 {
 		return Result{}, errors.New("max segment length cannot be negative")
 	}
@@ -79,53 +84,46 @@ func Build(input Input) (Result, error) {
 				continue
 			}
 
-			clippedFrom, clippedTo := false, false
-			fromPoint, toPoint := from.Point, to.Point
-			if input.BBox != nil {
-				var visible bool
-				fromPoint, toPoint, clippedFrom, clippedTo, visible = clipLine(fromPoint, toPoint, *input.BBox)
-				if !visible {
+			for _, piece := range visibleLinePieces(from.Point, to.Point, input.BBox, input.BBoxes) {
+				if pointsEqual(piece.from, piece.to) {
+					result.Report.SegmentsRejected++
+					result.Report.ZeroLengthSegments++
 					continue
 				}
-			}
-			if pointsEqual(fromPoint, toPoint) {
-				result.Report.SegmentsRejected++
-				result.Report.ZeroLengthSegments++
-				continue
-			}
 
-			fromKey := sourceNodeKey(fromID)
-			fromSourceID := fromID
-			if clippedFrom {
-				fromKey = boundaryNodeKey(way.SourceID, pairIndex, 0, fromPoint)
-				fromSourceID = 0
-			}
-			toKey := sourceNodeKey(toID)
-			toSourceID := toID
-			if clippedTo {
-				toKey = boundaryNodeKey(way.SourceID, pairIndex, 1, toPoint)
-				toSourceID = 0
-			}
+				fromKey := sourceNodeKey(fromID)
+				fromSourceID := fromID
+				if piece.clippedFrom {
+					fromKey = boundaryNodeKey(way.SourceID, pairIndex, 0, piece.from)
+					fromSourceID = 0
+				}
+				toKey := sourceNodeKey(toID)
+				toSourceID := toID
+				if piece.clippedTo {
+					toKey = boundaryNodeKey(way.SourceID, pairIndex, 1, piece.to)
+					toSourceID = 0
+				}
 
-			addGraphNode(graphNodes, fromKey, fromPoint, fromSourceID, from.Tags, clippedFrom)
-			addGraphNode(graphNodes, toKey, toPoint, toSourceID, to.Tags, clippedTo)
-			edge := graphEdge{
-				a:          fromKey,
-				b:          toKey,
-				profile:    profile,
-				sourceWays: []int64{way.SourceID},
-				clipped:    clippedFrom || clippedTo,
+				addGraphNode(graphNodes, fromKey, piece.from, fromSourceID, from.Tags, piece.clippedFrom)
+				addGraphNode(graphNodes, toKey, piece.to, toSourceID, to.Tags, piece.clippedTo)
+				edge := graphEdge{
+					a:          fromKey,
+					b:          toKey,
+					profile:    profile,
+					sourceWays: []int64{way.SourceID},
+					clipped:    piece.clippedFrom || piece.clippedTo,
+				}
+				key := canonicalAtomicKey(graphNodes[fromKey].point, graphNodes[toKey].point, profile.semanticKey)
+				if existingIndex, duplicate := atomicDuplicates[key]; duplicate {
+					edges[existingIndex].sourceWays = appendUniqueInt64(edges[existingIndex].sourceWays, way.SourceID)
+					edges[existingIndex].clipped = edges[existingIndex].clipped || edge.clipped
+					result.Report.SegmentsDeduplicated++
+					result.Report.DuplicateGeometry++
+					continue
+				}
+				atomicDuplicates[key] = len(edges)
+				edges = append(edges, edge)
 			}
-			key := canonicalAtomicKey(graphNodes[fromKey].point, graphNodes[toKey].point, profile.semanticKey)
-			if existingIndex, duplicate := atomicDuplicates[key]; duplicate {
-				edges[existingIndex].sourceWays = appendUniqueInt64(edges[existingIndex].sourceWays, way.SourceID)
-				edges[existingIndex].clipped = edges[existingIndex].clipped || edge.clipped
-				result.Report.SegmentsDeduplicated++
-				result.Report.DuplicateGeometry++
-				continue
-			}
-			atomicDuplicates[key] = len(edges)
-			edges = append(edges, edge)
 		}
 	}
 
@@ -140,6 +138,38 @@ func Build(input Input) (Result, error) {
 	result.Segments = drafts
 	finalizeReport(&result.Report, drafts)
 	return result, nil
+}
+
+type linePiece struct {
+	from        domain.Point
+	to          domain.Point
+	clippedFrom bool
+	clippedTo   bool
+}
+
+func visibleLinePieces(from, to domain.Point, bbox *BBox, bboxes []BBox) []linePiece {
+	if bbox == nil && len(bboxes) == 0 {
+		return []linePiece{{from: from, to: to}}
+	}
+	clipBoxes := bboxes
+	if bbox != nil {
+		clipBoxes = append([]BBox{*bbox}, clipBoxes...)
+	}
+	pieces := make([]linePiece, 0, len(clipBoxes))
+	seen := make(map[string]struct{}, len(clipBoxes))
+	for _, clipBox := range clipBoxes {
+		pieceFrom, pieceTo, clippedFrom, clippedTo, visible := clipLine(from, to, clipBox)
+		if !visible || pointsEqual(pieceFrom, pieceTo) {
+			continue
+		}
+		key := canonicalGeometryKey([]domain.Point{pieceFrom, pieceTo})
+		if _, duplicate := seen[key]; duplicate {
+			continue
+		}
+		seen[key] = struct{}{}
+		pieces = append(pieces, linePiece{from: pieceFrom, to: pieceTo, clippedFrom: clippedFrom, clippedTo: clippedTo})
+	}
+	return pieces
 }
 
 func addGraphNode(nodes map[string]graphNode, key string, point domain.Point, sourceID int64, tags map[string]string, boundary bool) {

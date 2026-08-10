@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/doveva/Gulyaem/backend/internal/geo/querying"
+	"github.com/doveva/Gulyaem/backend/internal/geo/routeanalysis"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -23,6 +24,7 @@ type Dependencies struct {
 	Environment    string
 	AllowedOrigins []string
 	Geo            *querying.Service
+	RouteAnalysis  *routeanalysis.Service
 }
 
 func NewHandler(deps Dependencies) http.Handler {
@@ -50,6 +52,7 @@ func NewHandler(deps Dependencies) http.Handler {
 		writeJSON(response, http.StatusOK, map[string]string{"status": "ready"})
 	})
 	registerGeoRoutes(router, deps)
+	registerRouteAnalysisRoutes(router, deps)
 
 	return router
 }
@@ -68,7 +71,7 @@ func cors(allowedOrigins []string) func(http.Handler) http.Handler {
 				response.Header().Set("Access-Control-Allow-Origin", origin)
 				response.Header().Set("Vary", "Origin")
 				response.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-				response.Header().Set("Access-Control-Allow-Methods", "GET,OPTIONS")
+				response.Header().Set("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
 			}
 			if request.Method == http.MethodOptions {
 				response.WriteHeader(http.StatusNoContent)

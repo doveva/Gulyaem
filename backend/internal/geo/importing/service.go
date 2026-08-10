@@ -32,6 +32,7 @@ type ImportRequest struct {
 	SourceURL            string
 	SourceTimestamp      *time.Time
 	BBox                 *BBox
+	ClipAreas            []BBox
 	NormalizationVersion string
 	MaxSegmentLength     float64
 }
@@ -102,7 +103,14 @@ func (service *Service) Import(ctx context.Context, request ImportRequest) (Impo
 		bbox = metadata.BBox
 	}
 	segmentInput := visitor.segmentInput(request.MaxSegmentLength)
-	if bbox != nil {
+	if len(request.ClipAreas) > 0 {
+		segmentInput.BBoxes = make([]segmenting.BBox, 0, len(request.ClipAreas))
+		for _, area := range request.ClipAreas {
+			segmentInput.BBoxes = append(segmentInput.BBoxes, segmenting.BBox{
+				West: area.West, South: area.South, East: area.East, North: area.North,
+			})
+		}
+	} else if bbox != nil {
 		segmentInput.BBox = &segmenting.BBox{
 			West: bbox.West, South: bbox.South, East: bbox.East, North: bbox.North,
 		}
@@ -136,9 +144,13 @@ func validateRequest(request ImportRequest) error {
 		return errors.New("normalization version is required")
 	case request.MaxSegmentLength < 0 || math.IsNaN(request.MaxSegmentLength) || math.IsInf(request.MaxSegmentLength, 0):
 		return errors.New("max segment length must be finite and non-negative")
-	default:
-		return nil
 	}
+	for _, area := range request.ClipAreas {
+		if !area.Valid() {
+			return errors.New("clip area bbox is invalid")
+		}
+	}
+	return nil
 }
 
 func fileChecksum(path string) (string, int64, error) {

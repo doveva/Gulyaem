@@ -16,6 +16,7 @@ directory stores inputs and fixture descriptions only.
 ## Main scenarios
 
 `test-areas/spb-dense-center` is the first immutable OSM PBF snapshot and manifest.
+`test-areas/spb-stage1-validation` combines the three Stage 1.5 matching and coverage areas.
 `districts/spb-administrative-districts` contains the full boundaries of the 18 Saint Petersburg
 administrative districts as a checksummed GeoJSON fixture.
 
@@ -23,6 +24,7 @@ administrative districts as a checksummed GeoJSON fixture.
 
 Each fixture directory owns its source artifact, manifest, checksum/provenance and area-specific
 README. Street graph fixtures live below `test-areas`; district fixtures live below `districts`.
+Curated immutable walking lines used by analysis experiments live below `sample-routes`.
 
 ## Run and verify
 

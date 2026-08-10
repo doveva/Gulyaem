@@ -30,6 +30,7 @@ type Input struct {
 	Nodes            []Node
 	Ways             []Way
 	BBox             *BBox
+	BBoxes           []BBox
 	MaxSegmentLength float64
 }
 

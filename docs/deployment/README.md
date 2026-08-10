@@ -70,7 +70,8 @@ make frontend
 
 Playground будет доступен на `http://localhost:5173/debug/geo`.
 
-`make geo-import` читает committed `spb-dense-center.osm.pbf`. Повторный запуск является
+`make geo-import` читает committed `spb-stage1-validation.osm.pbf`; regression fixture
+`spb-dense-center` можно выбрать явно. Повторный запуск является
 идемпотентным и не требует сети. Импорт строит `StreetSegment` в памяти и публикует их вместе с
 новой `GeoDataVersion` одной транзакцией. Container-вариант той же операции:
 
@@ -108,7 +109,8 @@ Frontend-переменные `VITE_*` встраиваются во время 
 стиль не является доменным контрактом и заменяется конфигурацией. `VITE_CITY_ID` выбирает город
 для инженерного playground; default совпадает с seeded UUID Санкт-Петербурга.
 
-`GEO_TEST_AREA` по умолчанию равен `spb-dense-center`. `NORMALIZATION_VERSION` входит в identity
+`GEO_TEST_AREA` по умолчанию равен `spb-stage1-validation`; `spb-dense-center` сохранён для
+регрессионных проверок. `NORMALIZATION_VERSION` входит в identity
 версии вместе с checksum: после изменения normalization rules его значение обязательно меняется.
 Stage 1.3 использует `stage1-segments-v1`. Если локальный `.env` был создан на Stage 1.2 и всё ещё
 содержит `stage1-v1`, обновите его либо выполните:

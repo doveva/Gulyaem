@@ -1,8 +1,8 @@
 # Frontend
 
-React and TypeScript engineering UI for inspecting Gulyaem geo data. Stage 1.4 provides a
-responsive `/debug/geo` playground for evaluating imported `StreetSegment` topology and the
-independently versioned administrative district layer.
+React and TypeScript engineering UI for inspecting Gulyaem geo data. Stage 1.5 extends the
+responsive `/debug/geo` playground with sample-route matching and radius coverage while retaining
+the imported `StreetSegment` topology and independently versioned administrative district layer.
 
 ## Responsibility
 
@@ -11,6 +11,7 @@ independently versioned administrative district layer.
 - provide viewport statistics, layer and length filters, endpoints/boundary markers and a segment
   inspector.
 - render district fill, boundaries, labels and a minimal district inspector.
+- compare sample routes and coverage profiles and inspect coverage provenance.
 
 ## Boundaries and dependencies
 
@@ -25,6 +26,7 @@ OpenFreeMap Liberty style and can be replaced without code changes.
 - filter by length and compare viewport count/length distributions;
 - select a segment and inspect its version, reason code and normalized attributes;
 - select a district and inspect its kind and source version; segment detail shows all intersecting districts;
+- choose one of five routes, run a profile and inspect matched/unmatched and coverage segments;
 - opt into source OSM metadata in non-production environments.
 
 ## Structure
@@ -32,6 +34,7 @@ OpenFreeMap Liberty style and can be replaced without code changes.
 ```text
 src/App.tsx       application shell and map lifecycle
 src/geo.ts        GeoJSON/API models and pure viewport helpers
+src/routeAnalysis.ts sample-route API models and GeoJSON layer adapters
 src/styles.css    mobile-first debug UI
 Dockerfile        production static build
 nginx.conf        SPA fallback and container health endpoint
@@ -60,9 +63,12 @@ build emits its worker as an explicit hashed asset and configures MapLibre with 
 
 ## Limitations and technical debt
 
-The playground intentionally has no route or coverage model. Requests are debounced by
-250 ms and stale requests are aborted. The API may ask the user to zoom in when the viewport is
-larger than 25 km² or contains more than 10,000 segments; the UI does not silently truncate data.
+The playground has only stateless sample-route analysis, not a production Walk or cumulative
+progress model. It overlays source/normalized routes, unmatched fragments, connectors and
+completed/partial/not-covered segments and compares coverage profiles. Viewport requests are
+debounced by 250 ms and stale requests are aborted. The API may ask the user to zoom in when the
+viewport is larger than 25 km² or contains more than 10,000 segments; the UI does not silently
+truncate data.
 
 ## Related documents
 
@@ -70,3 +76,4 @@ larger than 25 km² or contains more than 10,000 segments; the UI does not silen
 - [`Architecture contract`](../docs/stage%201/architecture-contract.md)
 - [`Geo Playground bbox API ADR`](../docs/adr/0003-geo-playground-bbox-api.md)
 - [`District data ADR`](../docs/adr/0004-versioned-administrative-districts.md)
+- [`Route matching and coverage ADR`](../docs/adr/0005-sample-route-matching-and-radius-coverage.md)

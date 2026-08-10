@@ -39,9 +39,17 @@ _Этот блок сформирован автоматически. Не ре�
 
 - [Geo data](../data/README.md)
 
+### `data/sample-routes/spb-stage1/`
+
+- [Saint Petersburg Stage 1 sample routes](../data/sample-routes/spb-stage1/README.md)
+
 ### `data/test-areas/spb-dense-center/`
 
 - [Saint Petersburg dense center fixture](../data/test-areas/spb-dense-center/README.md)
+
+### `data/test-areas/spb-stage1-validation/`
+
+- [Saint Petersburg Stage 1 validation fixture](../data/test-areas/spb-stage1-validation/README.md)
 
 ### `docs/adr/`
 
@@ -49,6 +57,7 @@ _Этот блок сформирован автоматически. Не ре�
 - [ADR-0002: Начальная topology и WalkabilityProfile для StreetSegment](adr/0002-street-segment-topology-and-walkability.md)
 - [ADR-0003: Bbox API и базовый Geo Playground для StreetSegment](adr/0003-geo-playground-bbox-api.md)
 - [ADR-0004: Версионируемые административные районы для Geo Playground](adr/0004-versioned-administrative-districts.md)
+- [ADR-0005: Последовательный map matching и радиусное exploration coverage](adr/0005-sample-route-matching-and-radius-coverage.md)
 - [ADR-NNNN: Краткое название решения](adr/adr-template.md)
 - [Architecture Decision Records](adr/README.md)
 

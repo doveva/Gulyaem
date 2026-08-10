@@ -23,11 +23,19 @@ Create a new dense-center candidate:
 scripts/geo/refresh-spb-dense-center.sh
 ```
 
+Create the combined Stage 1.5 validation candidate (with a hard 20 MB review gate):
+
+```bash
+scripts/geo/refresh-spb-stage1-validation.sh
+```
+
 An optional first argument selects the candidate output directory.
 
 ## Structure
 
 - `refresh-spb-dense-center.sh` — fetch, PBF conversion and metadata inspection.
+- `refresh-spb-stage1-validation.sh` — fetch and merge three validation areas, then check size,
+  references and metadata.
 
 ## Run and verify
 

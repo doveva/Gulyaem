@@ -8,7 +8,7 @@ API_PORT ?= 8080
 ENVIRONMENT ?= development
 LOG_LEVEL ?= info
 GEO_DATA_PATH ?= $(CURDIR)/data
-GEO_TEST_AREA ?= spb-dense-center
+GEO_TEST_AREA ?= spb-stage1-validation
 GEO_CITY_CODE ?= spb
 GEO_IMPORT_FILE ?=
 NORMALIZATION_VERSION ?= stage1-segments-v1
@@ -25,7 +25,7 @@ DATABASE_URL ?= postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:$(POS
 HTTP_ADDRESS ?= :$(API_PORT)
 
 ifeq ($(strip $(GEO_TEST_AREA)),)
-GEO_TEST_AREA := spb-dense-center
+GEO_TEST_AREA := spb-stage1-validation
 endif
 
 ifeq ($(strip $(NORMALIZATION_VERSION)),)

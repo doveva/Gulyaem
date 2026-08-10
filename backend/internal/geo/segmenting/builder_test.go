@@ -103,6 +103,26 @@ func TestBBoxClippingCreatesBoundarySegment(t *testing.T) {
 	}
 }
 
+func TestMultipleClipAreasKeepOnlyTheirDisjointPieces(t *testing.T) {
+	result := mustBuild(t, Input{
+		Nodes: testNodes(testNode(1, -1, 0.5), testNode(2, 4, 0.5)),
+		Ways:  []Way{{SourceID: 10, NodeIDs: []int64{1, 2}, Tags: map[string]string{"highway": "footway"}}},
+		BBoxes: []BBox{
+			{West: 0, South: 0, East: 1, North: 1},
+			{West: 2, South: 0, East: 3, North: 1},
+		},
+	})
+	if len(result.Segments) != 2 {
+		t.Fatalf("segments = %d, want 2", len(result.Segments))
+	}
+	if !pointsEqual(result.Segments[0].Geometry[0], domain.Point{Lon: 0, Lat: 0.5}) ||
+		!pointsEqual(result.Segments[0].Geometry[1], domain.Point{Lon: 1, Lat: 0.5}) ||
+		!pointsEqual(result.Segments[1].Geometry[0], domain.Point{Lon: 2, Lat: 0.5}) ||
+		!pointsEqual(result.Segments[1].Geometry[1], domain.Point{Lon: 3, Lat: 0.5}) {
+		t.Fatalf("geometries = %v, %v", result.Segments[0].Geometry, result.Segments[1].Geometry)
+	}
+}
+
 func TestMissingReferencedNodeFailsBuild(t *testing.T) {
 	_, err := Build(Input{
 		Nodes: testNodes(testNode(1, 0, 0)),

@@ -116,6 +116,9 @@ coverage visualization
 
 Do not turn this into production Walk/Route domain.
 
+Status: completed. The agreed sequential matcher, exact PostGIS buffer intersection, three
+profiles, five routes in three areas and debug visualization are recorded in ADR-0005.
+
 Done when:
 
 - same sample route can be compared under different thresholds;

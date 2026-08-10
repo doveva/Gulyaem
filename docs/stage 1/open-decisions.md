@@ -63,6 +63,10 @@ Determine how much `Street` normalization is needed now versus later.
 
 ## OD-05 Coverage threshold
 
+**Initial Stage 1.5 decision:** use Strict, Balanced and Generous profiles plus custom parameters;
+the exact threshold formula is capped by segment length. Balanced is the default comparison
+profile. See [`ADR-0005`](../adr/0005-sample-route-matching-and-radius-coverage.md).
+
 Need to determine:
 
 ```text
@@ -74,6 +78,9 @@ max_required_m
 through real-route experiments.
 
 ## OD-06 Partial coverage
+
+**Initial Stage 1.5 decision:** preserve `PARTIAL` per request and do not accumulate progress
+between sample routes. Production cumulative progress remains outside Stage 1.
 
 Decide whether MVP needs cumulative partial coverage or whether binary completion is enough after proper segmentation.
 

@@ -3,6 +3,18 @@ import { GeoJSONSource, Map, NavigationControl, setWorkerUrl, type MapMouseEvent
 import maplibreWorkerURL from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { isGeoPlaygroundPath } from './routing'
 import {
+  coverageCollection,
+  matchedCollection,
+  normalizedFeature,
+  routeBounds,
+  routeFeature,
+  unmatchedCollection,
+  type CoverageFeature,
+  type RouteAnalysis,
+  type SampleRoute,
+  type SampleRouteCollection,
+} from './routeAnalysis'
+import {
   CITY_ID,
   CLASSIFICATIONS,
   EMPTY_STATISTICS,
@@ -44,6 +56,7 @@ const classificationColors: Record<Classification, string> = {
   ROUTABLE_ONLY: '#f0b34d',
   IGNORE: '#b77774',
 }
+const coverageLayerIDs = ['coverage-not-covered', 'coverage-partial', 'coverage-completed', 'coverage-connector']
 
 setWorkerUrl(maplibreWorkerURL)
 
@@ -54,6 +67,7 @@ export function App() {
   const requestViewportRef = useRef<() => void>(() => undefined)
   const viewportAbort = useRef<AbortController | null>(null)
   const detailAbort = useRef<AbortController | null>(null)
+  const analysisAbort = useRef<AbortController | null>(null)
   const requestSequence = useRef(0)
   const [mapReady, setMapReady] = useState(false)
   const [apiState, setApiState] = useState<ApiState>('checking')
@@ -70,7 +84,7 @@ export function App() {
   const visibilityRef = useRef(visibility)
   const showDistrictsRef = useRef(true)
   const [showBasemap, setShowBasemap] = useState(true)
-  const [showPoints, setShowPoints] = useState(true)
+  const [showPoints, setShowPoints] = useState(false)
   const [showDistricts, setShowDistricts] = useState(true)
   const [minimumInput, setMinimumInput] = useState('')
   const [maximumInput, setMaximumInput] = useState('')
@@ -82,6 +96,18 @@ export function App() {
   const [selectedDistrict, setSelectedDistrict] = useState<DistrictProperties | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [showDebug, setShowDebug] = useState(false)
+  const [routes, setRoutes] = useState<SampleRoute[]>([])
+  const [selectedRouteID, setSelectedRouteID] = useState('')
+  const [coverageProfile, setCoverageProfile] = useState('balanced')
+  const [customRadius, setCustomRadius] = useState('20')
+  const [customRatio, setCustomRatio] = useState('0.6')
+  const [customMinimum, setCustomMinimum] = useState('15')
+  const [customMaximum, setCustomMaximum] = useState('80')
+  const [analysis, setAnalysis] = useState<RouteAnalysis | null>(null)
+  const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
+  const [selectedCoverage, setSelectedCoverage] = useState<CoverageFeature['properties'] | null>(null)
+  const selectedRoute = useMemo(() => routes.find((route) => route.id === selectedRouteID) ?? null, [routes, selectedRouteID])
 
   useEffect(() => {
     visibilityRef.current = visibility
@@ -173,11 +199,21 @@ export function App() {
       debounceTimer = window.setTimeout(requestViewport, 250)
     }
     const onMapClick = (event: MapMouseEvent) => {
+      const coverageFeature = instance.queryRenderedFeatures(event.point, {
+        layers: coverageLayerIDs.filter((layer) => instance.getLayer(layer)),
+      })[0]
+      if (coverageFeature?.properties?.id) {
+        setSelectedCoverage(coverageFeature.properties as CoverageFeature['properties'])
+        setSelectedID(null)
+        setSelectedDistrict(null)
+        return
+      }
       const layers = Object.values(lineLayers).filter((layer) => instance.getLayer(layer))
       const feature = instance.queryRenderedFeatures(event.point, { layers })[0]
       const id = feature?.properties?.id
       if (typeof id === 'string') {
         setDetailLoading(true)
+        setSelectedCoverage(null)
         setSelectedDistrict(null)
         setSelectedID(id)
         return
@@ -186,6 +222,7 @@ export function App() {
         ? instance.queryRenderedFeatures(event.point, { layers: ['district-fill'] })[0]
         : undefined
       if (district?.properties && typeof district.properties.id === 'string') {
+        setSelectedCoverage(null)
         setSelectedID(null)
         setSelected(null)
         setDetailLoading(false)
@@ -193,7 +230,7 @@ export function App() {
       }
     }
     const onMouseMove = (event: MapMouseEvent) => {
-      const layers = [...Object.values(lineLayers), 'district-fill'].filter((layer) => instance.getLayer(layer))
+      const layers = [...coverageLayerIDs, ...Object.values(lineLayers), 'district-fill'].filter((layer) => instance.getLayer(layer))
       instance.getCanvas().style.cursor = instance.queryRenderedFeatures(event.point, { layers }).length > 0 ? 'pointer' : ''
     }
 
@@ -233,6 +270,47 @@ export function App() {
           },
         })
       }
+      instance.addSource('route-source', { type: 'geojson', data: routeFeature(null) })
+      instance.addLayer({
+        id: 'route-source-line', type: 'line', source: 'route-source',
+        paint: { 'line-color': '#b98cff', 'line-width': 3, 'line-dasharray': [2, 1.5], 'line-opacity': 0.8 },
+      })
+      instance.addSource('route-coverage', { type: 'geojson', data: coverageCollection(null) })
+      for (const [id, status, color, opacity] of [
+        ['coverage-not-covered', 'NOT_COVERED', '#82908d', 0.42],
+        ['coverage-partial', 'PARTIAL', '#efc84b', 0.9],
+        ['coverage-completed', 'COMPLETED', '#40d48f', 0.95],
+        ['coverage-connector', 'CONNECTOR', '#55aef2', 0.95],
+      ] as const) {
+        instance.addLayer({
+          id, type: 'line', source: 'route-coverage', filter: ['==', ['get', 'status'], status],
+          paint: {
+            'line-color': color, 'line-width': ['interpolate', ['linear'], ['zoom'], 13, 3, 17, 7],
+            'line-opacity': opacity,
+            ...(status === 'CONNECTOR' ? { 'line-dasharray': [1.5, 1.2] } : {}),
+          },
+        })
+      }
+      instance.addLayer({
+        id: 'coverage-direct-outline', type: 'line', source: 'route-coverage',
+        filter: ['in', ['get', 'provenance'], ['literal', ['DIRECT', 'DIRECT_AND_RADIUS']]],
+        paint: { 'line-color': '#f5fff9', 'line-width': 1.2, 'line-opacity': 0.78, 'line-dasharray': [1, 1.6] },
+      })
+      instance.addSource('route-normalized', { type: 'geojson', data: normalizedFeature(null) })
+      instance.addLayer({
+        id: 'route-normalized-line', type: 'line', source: 'route-normalized',
+        paint: { 'line-color': '#69f3d1', 'line-width': 2.2, 'line-opacity': 0.92 },
+      })
+      instance.addSource('route-matched', { type: 'geojson', data: matchedCollection(null) })
+      instance.addLayer({
+        id: 'route-matched-line', type: 'line', source: 'route-matched',
+        paint: { 'line-color': '#d8fff4', 'line-width': 1.1, 'line-opacity': 0.72 },
+      })
+      instance.addSource('route-unmatched', { type: 'geojson', data: unmatchedCollection(null) })
+      instance.addLayer({
+        id: 'route-unmatched-line', type: 'line', source: 'route-unmatched',
+        paint: { 'line-color': '#ff625f', 'line-width': 5, 'line-opacity': 0.98 },
+      })
       instance.addLayer({
         id: 'segment-selection', type: 'line', source: 'segments',
         filter: ['==', ['get', 'id'], ''],
@@ -261,6 +339,7 @@ export function App() {
       window.clearTimeout(debounceTimer)
       viewportAbort.current?.abort()
       detailAbort.current?.abort()
+      analysisAbort.current?.abort()
       instance.remove()
       map.current = null
     }
@@ -284,6 +363,24 @@ export function App() {
   }, [])
 
   useEffect(() => {
+    const controller = new AbortController()
+    fetch(`${apiURL}/api/v1/geo/sample-routes?cityId=${CITY_ID}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`API вернул ${response.status}`)
+        return response.json() as Promise<SampleRouteCollection>
+      })
+      .then((result) => {
+        setRoutes(result.routes)
+        setSelectedRouteID((current) => current || result.routes[0]?.id || '')
+        if (result.warnings.length > 0) setAnalysisError(`Fixture warning: ${result.warnings.join(', ')}`)
+      })
+      .catch((cause: unknown) => {
+        if (!controller.signal.aborted) setAnalysisError(cause instanceof Error ? cause.message : 'Маршруты недоступны')
+      })
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
     if (!mapReady || !map.current) return
     const source = map.current.getSource('segments') as GeoJSONSource
     source.setData(collection)
@@ -296,6 +393,20 @@ export function App() {
     ;(map.current.getSource('districts') as GeoJSONSource).setData(districtCollection)
     ;(map.current.getSource('district-labels') as GeoJSONSource).setData(districtLabelCollection(districtCollection))
   }, [districtCollection, mapReady])
+
+  useEffect(() => {
+    if (!mapReady || !map.current) return
+    ;(map.current.getSource('route-source') as GeoJSONSource).setData(routeFeature(selectedRoute))
+    if (selectedRoute) map.current.fitBounds(routeBounds(selectedRoute), { padding: 110, duration: 550, maxZoom: 15.8 })
+  }, [selectedRoute, mapReady])
+
+  useEffect(() => {
+    if (!mapReady || !map.current) return
+    ;(map.current.getSource('route-normalized') as GeoJSONSource).setData(normalizedFeature(analysis))
+    ;(map.current.getSource('route-matched') as GeoJSONSource).setData(matchedCollection(analysis))
+    ;(map.current.getSource('route-unmatched') as GeoJSONSource).setData(unmatchedCollection(analysis))
+    ;(map.current.getSource('route-coverage') as GeoJSONSource).setData(coverageCollection(analysis))
+  }, [analysis, mapReady])
 
   useEffect(() => {
     if (!mapReady || !map.current) return
@@ -378,6 +489,47 @@ export function App() {
     requestViewportRef.current()
   }
 
+  const runAnalysis = () => {
+    if (!selectedRoute) return
+    const customValues = [customRadius, customRatio, customMinimum, customMaximum].map(Number)
+    if (coverageProfile === 'custom' && customValues.some((value) => !Number.isFinite(value))) {
+      setAnalysisError('Параметры custom-профиля должны быть числами')
+      return
+    }
+    analysisAbort.current?.abort()
+    const controller = new AbortController()
+    analysisAbort.current = controller
+    setAnalysisLoading(true)
+    setAnalysisError(null)
+    setSelectedCoverage(null)
+    const analysisVisibility: Visibility = { EXPLORE: false, ROUTABLE_ONLY: false, IGNORE: false }
+    visibilityRef.current = analysisVisibility
+    setVisibility(analysisVisibility)
+    const coverage = coverageProfile === 'custom'
+      ? {
+          profile: 'custom', radiusMeters: customValues[0], coverageRatio: customValues[1],
+          minRequiredMeters: customValues[2], maxRequiredMeters: customValues[3],
+        }
+      : { profile: coverageProfile }
+    fetch(`${apiURL}/api/v1/geo/sample-routes/${selectedRoute.id}/analyze?cityId=${CITY_ID}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
+      body: JSON.stringify({ coverage }),
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => ({}))) as APIErrorPayload
+          throw new Error(payload.error?.message ?? `API вернул ${response.status}`)
+        }
+        return response.json() as Promise<RouteAnalysis>
+      })
+      .then((result) => { setAnalysis(result); setAnalysisLoading(false) })
+      .catch((cause: unknown) => {
+        if (controller.signal.aborted) return
+        setAnalysisLoading(false)
+        setAnalysisError(cause instanceof Error ? cause.message : 'Анализ не выполнен')
+      })
+  }
+
   if (!isGeoPlaygroundPath(window.location.pathname)) {
     return (
       <main className="not-found">
@@ -394,8 +546,8 @@ export function App() {
       <div ref={mapContainer} className="map" aria-label="Карта сегментов центра Санкт-Петербурга" />
       <header className="topbar">
         <div>
-          <p className="eyebrow">Stage 1.4 · Geo Playground</p>
-          <h1>ГуляЕм <span>/ StreetSegment</span></h1>
+          <p className="eyebrow">Stage 1.5 · Geo Playground</p>
+          <h1>ГуляЕм <span>/ Matching & Coverage</span></h1>
         </div>
         <div className={`api-status api-status--${apiState}`} role="status">
           <span aria-hidden="true" />
@@ -410,6 +562,45 @@ export function App() {
           <div><p className="panel-label">Видимый viewport</p><h2>Слои и фильтры</h2></div>
           <span className={loading ? 'loading-dot loading-dot--active' : 'loading-dot'} aria-label={loading ? 'Загрузка' : 'Загружено'} />
         </div>
+        <section className="route-controls">
+          <p className="panel-label">Sample route</p>
+          <select value={selectedRouteID} onChange={(event) => {
+            setSelectedRouteID(event.target.value)
+            setAnalysis(null)
+            setSelectedCoverage(null)
+          }} aria-label="Тестовый маршрут">
+            {routes.map((route) => <option key={route.id} value={route.id}>{route.name}</option>)}
+          </select>
+          {selectedRoute && <p className="route-description">{selectedRoute.description}{selectedRoute.intentionalUnmatched ? ' · есть намеренный unmatched-фрагмент' : ''}</p>}
+          <div className="profile-row">
+            <label>Профиль<select value={coverageProfile} onChange={(event) => setCoverageProfile(event.target.value)}>
+              <option value="strict">Strict · 10 м</option>
+              <option value="balanced">Balanced · 20 м</option>
+              <option value="generous">Generous · 35 м</option>
+              <option value="custom">Custom</option>
+            </select></label>
+            <button onClick={runAnalysis} disabled={!selectedRoute || analysisLoading}>{analysisLoading ? 'Считаем…' : 'Анализировать'}</button>
+          </div>
+          {coverageProfile === 'custom' && <div className="custom-profile">
+            <label>Радиус, м<input value={customRadius} onChange={(event) => setCustomRadius(event.target.value)} inputMode="decimal" /></label>
+            <label>Доля<input value={customRatio} onChange={(event) => setCustomRatio(event.target.value)} inputMode="decimal" /></label>
+            <label>Min, м<input value={customMinimum} onChange={(event) => setCustomMinimum(event.target.value)} inputMode="decimal" /></label>
+            <label>Max, м<input value={customMaximum} onChange={(event) => setCustomMaximum(event.target.value)} inputMode="decimal" /></label>
+          </div>}
+          {analysisError && <p className="inline-error">{analysisError}</p>}
+          {analysis && <>
+            <div className="coverage-legend">
+              <span className="completed">Completed</span><span className="partial">Partial</span>
+              <span className="not-covered">Not covered</span><span className="connector">Connector</span>
+            </div>
+            <div className="stats-grid route-stats">
+              <Stat label="Matched" value={`${formatNumber(analysis.metrics.routeMatchedRatio * 100)}%`} />
+              <Stat label="Completed" value={`${formatNumber(analysis.metrics.completedNetworkRatio * 100)}%`} />
+              <Stat label="Покрыто" value={formatDistance(analysis.metrics.geometricCoveredLengthMeters)} />
+              <Stat label="Unmatched" value={formatDistance(analysis.metrics.routeUnmatchedLengthMeters)} />
+            </div>
+          </>}
+        </section>
         <div className="classification-list">
           {CLASSIFICATIONS.map((classification) => (
             <label className="layer-toggle" key={classification}>
@@ -440,13 +631,13 @@ export function App() {
         <div className="diagnostics"><span>&lt; 5 м <b>{statistics.shortSegmentCount}</b></span><span>&gt; 500 м <b>{statistics.longSegmentCount}</b></span></div>
       </aside>
 
-      <aside className={`inspector panel ${selectedID || selectedDistrict ? 'inspector--open' : ''}`} aria-live="polite">
+      <aside className={`inspector panel ${selectedID || selectedDistrict || selectedCoverage ? 'inspector--open' : ''}`} aria-live="polite">
         <div className="inspector-handle" />
         <div className="panel-heading">
-          <div><p className="panel-label">Инспектор</p><h2>{selectedDistrict?.name ?? selected?.street?.name ?? (selectedID ? 'Сегмент' : 'Выберите объект')}</h2></div>
-          {(selectedID || selectedDistrict) && <button className="icon-button" onClick={() => { setSelectedID(null); setSelected(null); setSelectedDistrict(null) }} aria-label="Закрыть инспектор">×</button>}
+          <div><p className="panel-label">Инспектор</p><h2>{selectedCoverage ? 'Покрытие сегмента' : selectedDistrict?.name ?? selected?.street?.name ?? (selectedID ? 'Сегмент' : 'Выберите объект')}</h2></div>
+          {(selectedID || selectedDistrict || selectedCoverage) && <button className="icon-button" onClick={() => { setSelectedID(null); setSelected(null); setSelectedDistrict(null); setSelectedCoverage(null) }} aria-label="Закрыть инспектор">×</button>}
         </div>
-        {!selectedID && !selectedDistrict && <p className="empty-message">Нажмите на цветную линию или район, чтобы увидеть детали.</p>}
+        {!selectedID && !selectedDistrict && !selectedCoverage && <p className="empty-message">Нажмите на цветную линию, покрытие или район, чтобы увидеть детали.</p>}
         {detailLoading && <p className="empty-message">Загружаем детали…</p>}
         {selectedDistrict && <>
           <div className="district-summary"><span>Административный район</span></div>
@@ -456,6 +647,18 @@ export function App() {
             <Detail label="Версия" value={selectedDistrict.districtDataVersionId} code />
             <Detail label="Нормализация" value={selectedDistrict.normalizationVersion} />
             <Detail label="External ID" value={selectedDistrict.externalId} code />
+          </dl>
+        </>}
+        {selectedCoverage && <>
+          <div className="segment-summary">
+            <span>{selectedCoverage.status}</span>
+            <strong>{formatDistance(Number(selectedCoverage.coveredMeters))}</strong>
+          </div>
+          <dl className="detail-list">
+            <Detail label="Происхождение" value={selectedCoverage.provenance || '—'} />
+            <Detail label="Требуется" value={formatDistance(Number(selectedCoverage.requiredMeters))} />
+            <Detail label="Длина" value={formatDistance(Number(selectedCoverage.lengthMeters))} />
+            <Detail label="ID" value={selectedCoverage.id} code />
           </dl>
         </>}
         {selected && !detailLoading && <>

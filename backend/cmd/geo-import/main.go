@@ -131,20 +131,28 @@ func buildRequest(dataRoot string, parsed options) (importing.ImportRequest, err
 		return importing.ImportRequest{}, err
 	}
 	timestamp := fixture.Manifest.Source.RetrievedAt
-	return importing.ImportRequest{
-		CityCode:         fixture.Manifest.CityCode,
-		FilePath:         fixture.FilePath,
-		ExpectedChecksum: fixture.Manifest.PBF.SHA256,
-		Source:           fixture.Manifest.Source.Name,
-		SourceURL:        fixture.Manifest.Source.URL,
-		SourceTimestamp:  &timestamp,
-		BBox: &importing.BBox{
-			West: fixture.Manifest.BBox.West, South: fixture.Manifest.BBox.South,
-			East: fixture.Manifest.BBox.East, North: fixture.Manifest.BBox.North,
-		},
+	request := importing.ImportRequest{
+		CityCode:             fixture.Manifest.CityCode,
+		FilePath:             fixture.FilePath,
+		ExpectedChecksum:     fixture.Manifest.PBF.SHA256,
+		Source:               fixture.Manifest.Source.Name,
+		SourceURL:            fixture.Manifest.Source.URL,
+		SourceTimestamp:      &timestamp,
 		NormalizationVersion: parsed.normalizationVersion,
 		MaxSegmentLength:     parsed.maxSegmentLength,
-	}, nil
+	}
+	if len(fixture.Manifest.Areas) == 0 {
+		request.BBox = &importing.BBox{
+			West: fixture.Manifest.BBox.West, South: fixture.Manifest.BBox.South,
+			East: fixture.Manifest.BBox.East, North: fixture.Manifest.BBox.North,
+		}
+	} else {
+		request.ClipAreas = make([]importing.BBox, 0, len(fixture.Manifest.Areas))
+		for _, area := range fixture.Manifest.Areas {
+			request.ClipAreas = append(request.ClipAreas, area.BBox)
+		}
+	}
+	return request, nil
 }
 
 func envFloatOrDefault(name string, fallback float64) (float64, error) {

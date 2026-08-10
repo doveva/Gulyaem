@@ -13,13 +13,20 @@ import (
 var fixtureNamePattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 
 type FixtureManifest struct {
-	SchemaVersion int    `json:"schemaVersion"`
-	Name          string `json:"name"`
-	Description   string `json:"description"`
-	CityCode      string `json:"cityCode"`
-	BBox          BBox   `json:"bbox"`
-	Source        Source `json:"source"`
-	PBF           PBF    `json:"pbf"`
+	SchemaVersion int           `json:"schemaVersion"`
+	Name          string        `json:"name"`
+	Description   string        `json:"description"`
+	CityCode      string        `json:"cityCode"`
+	BBox          BBox          `json:"bbox"`
+	Areas         []FixtureArea `json:"areas,omitempty"`
+	Source        Source        `json:"source"`
+	PBF           PBF           `json:"pbf"`
+}
+
+type FixtureArea struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	BBox        BBox   `json:"bbox"`
 }
 
 type BBox struct {
@@ -88,9 +95,26 @@ func validateManifest(manifest FixtureManifest, expectedName string) error {
 		return errors.New("fixture PBF file is required")
 	case !regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(manifest.PBF.SHA256):
 		return errors.New("fixture PBF sha256 must be 64 lowercase hexadecimal characters")
-	case manifest.BBox.West >= manifest.BBox.East || manifest.BBox.South >= manifest.BBox.North:
+	case !manifest.BBox.Valid():
 		return errors.New("fixture bbox is invalid")
-	default:
-		return nil
 	}
+	areaNames := make(map[string]struct{}, len(manifest.Areas))
+	for _, area := range manifest.Areas {
+		if !fixtureNamePattern.MatchString(area.Name) {
+			return fmt.Errorf("fixture area name %q is invalid", area.Name)
+		}
+		if !area.BBox.Valid() {
+			return fmt.Errorf("fixture area %q bbox is invalid", area.Name)
+		}
+		if _, duplicate := areaNames[area.Name]; duplicate {
+			return fmt.Errorf("fixture area name %q is duplicated", area.Name)
+		}
+		areaNames[area.Name] = struct{}{}
+	}
+	return nil
+}
+
+func (bbox BBox) Valid() bool {
+	return bbox.West >= -180 && bbox.East <= 180 && bbox.South >= -90 && bbox.North <= 90 &&
+		bbox.West < bbox.East && bbox.South < bbox.North
 }

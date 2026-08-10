@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestLoadFixtureRejectsPathEscape(t *testing.T) {
@@ -53,4 +54,31 @@ func TestLoadCommittedDenseCenterFixture(t *testing.T) {
 	if checksum != fixture.Manifest.PBF.SHA256 {
 		t.Fatalf("fixture checksum = %s, manifest = %s", checksum, fixture.Manifest.PBF.SHA256)
 	}
+}
+
+func TestValidateManifestRejectsDuplicateAreaNames(t *testing.T) {
+	manifest := FixtureManifest{
+		SchemaVersion: 1,
+		Name:          "fixture",
+		CityCode:      "spb",
+		BBox:          BBox{West: 30, South: 59, East: 31, North: 60},
+		Areas: []FixtureArea{
+			{Name: "center", BBox: BBox{West: 30, South: 59, East: 30.2, North: 59.2}},
+			{Name: "center", BBox: BBox{West: 30.3, South: 59.3, East: 30.5, North: 59.5}},
+		},
+		Source: Source{Name: "openstreetmap", RetrievedAt: mustParseTime(t, "2026-08-09T00:00:00Z")},
+		PBF:    PBF{File: "fixture.osm.pbf", SHA256: strings.Repeat("a", 64)},
+	}
+	if err := validateManifest(manifest, "fixture"); err == nil || !strings.Contains(err.Error(), "duplicated") {
+		t.Fatalf("validateManifest() error = %v", err)
+	}
+}
+
+func mustParseTime(t *testing.T, value string) time.Time {
+	t.Helper()
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return parsed
 }

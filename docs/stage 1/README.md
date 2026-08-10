@@ -109,3 +109,12 @@ segment network. Контракт зафиксирован в [`ADR-0003`](../ad
 
 Sample routes и coverage остаются Stage 1.5. Контракт зафиксирован в
 [`ADR-0004`](../adr/0004-versioned-administrative-districts.md).
+
+### Stage 1.5 — sample routes, matching and coverage
+
+Добавлен единый validation dataset для центра, Калининского коридора и Сосновки, пять реальных
+route fixtures, последовательный prototype matcher и точное радиусное coverage в PostGIS.
+Playground сравнивает Strict/Balanced/Generous/custom profiles и отдельно показывает source,
+normalized, unmatched, connectors, partial и completed network. Результаты не сохраняются и не
+образуют production Walk/progress domain. Контракт зафиксирован в
+[`ADR-0005`](../adr/0005-sample-route-matching-and-radius-coverage.md).

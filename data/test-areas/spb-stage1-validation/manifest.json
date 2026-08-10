@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "name": "spb-stage1-validation",
+  "description": "Stage 1 route matching and coverage validation areas in Saint Petersburg",
+  "cityCode": "spb",
+  "bbox": {
+    "west": 30.3000,
+    "south": 59.9300,
+    "east": 30.4250,
+    "north": 60.0410
+  },
+  "areas": [
+    {
+      "name": "dense-center",
+      "description": "Nevsky Prospekt, Admiralteyskaya and nearby courtyards and canals",
+      "bbox": {"west": 30.3000, "south": 59.9300, "east": 30.3300, "north": 59.9450}
+    },
+    {
+      "name": "kalininsky-corridor",
+      "description": "Urban corridor from Akademicheskaya to Grazhdansky Prospekt metro stations",
+      "bbox": {"west": 30.3850, "south": 60.0060, "east": 30.4250, "north": 60.0410}
+    },
+    {
+      "name": "sosnovka-park",
+      "description": "Sosnovka park and residential edges near Tikhoretsky, Severny and Svetlanovsky",
+      "bbox": {"west": 30.3260, "south": 60.0080, "east": 30.3730, "north": 60.0360}
+    }
+  ],
+  "source": {
+    "name": "openstreetmap",
+    "url": "https://api.openstreetmap.org/api/0.6/map",
+    "retrievedAt": "2026-08-10T07:08:22Z",
+    "attribution": "© OpenStreetMap contributors, ODbL 1.0"
+  },
+  "pbf": {
+    "file": "spb-stage1-validation.osm.pbf",
+    "sha256": "05fa864bb753ffc4b2c632deae28e6b6ed80b8e677f65a9689d786596aa0e8ae"
+  }
+}

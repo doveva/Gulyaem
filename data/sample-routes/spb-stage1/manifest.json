@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "name": "spb-stage1",
+  "description": "Five curated Stage 1.5 route matching and coverage fixtures",
+  "cityCode": "spb",
+  "geoFixture": "spb-stage1-validation",
+  "expectedSourceChecksum": "05fa864bb753ffc4b2c632deae28e6b6ed80b8e677f65a9689d786596aa0e8ae",
+  "expectedNormalizationVersion": "stage1-segments-v1",
+  "routes": {
+    "file": "routes.geojson",
+    "sha256": "bd56a721dfe7b945b3f324516d99d191e9ad4e8071832e417ebb267f3600b6f8"
+  }
+}
