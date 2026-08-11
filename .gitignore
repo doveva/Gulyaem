@@ -11,6 +11,8 @@ backend/coverage.out
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
 
 # Stage 1.6 routing-engine graphs and host-specific measurements
 .routing/

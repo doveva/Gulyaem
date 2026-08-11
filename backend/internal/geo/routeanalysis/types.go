@@ -9,7 +9,11 @@ import (
 	"github.com/doveva/Gulyaem/backend/internal/geo/querying"
 )
 
-const AnalysisContextRadiusMeters = 75.0
+const (
+	AnalysisContextRadiusMeters = 225.0
+	MinCoverageRadiusMeters     = 5.0
+	MaxCoverageRadiusMeters     = 200.0
+)
 
 type MatchingParameters struct {
 	SampleStepMeters        float64 `json:"sampleStepMeters"`
@@ -31,9 +35,9 @@ type CoverageProfile struct {
 }
 
 var CoverageProfiles = map[string]CoverageProfile{
-	"strict":   {Name: "strict", RadiusMeters: 10, CoverageRatio: .8, MinRequiredMeters: 20, MaxRequiredMeters: 120},
-	"balanced": {Name: "balanced", RadiusMeters: 20, CoverageRatio: .6, MinRequiredMeters: 15, MaxRequiredMeters: 80},
-	"generous": {Name: "generous", RadiusMeters: 35, CoverageRatio: .4, MinRequiredMeters: 10, MaxRequiredMeters: 50},
+	"strict":   {Name: "strict", RadiusMeters: 35, CoverageRatio: .8, MinRequiredMeters: 20, MaxRequiredMeters: 120},
+	"balanced": {Name: "balanced", RadiusMeters: 50, CoverageRatio: .6, MinRequiredMeters: 15, MaxRequiredMeters: 80},
+	"generous": {Name: "generous", RadiusMeters: 100, CoverageRatio: .4, MinRequiredMeters: 10, MaxRequiredMeters: 50},
 }
 
 type AnalyzeRequest struct {
@@ -79,10 +83,15 @@ type CandidateSegment struct {
 	RadiusCoveredMeters float64
 }
 
+type NormalizedRouteFragment struct {
+	Geometry       []domain.Point
+	GradeSignature string
+}
+
 type Repository interface {
 	CurrentVersion(context.Context, string) (querying.Version, error)
 	CandidateSegments(context.Context, string, json.RawMessage, float64) ([]CandidateSegment, error)
-	CoverageSegments(context.Context, string, json.RawMessage, float64, float64) ([]CandidateSegment, error)
+	CoverageSegments(context.Context, string, []NormalizedRouteFragment, float64, float64) ([]CandidateSegment, error)
 }
 
 type Score struct {

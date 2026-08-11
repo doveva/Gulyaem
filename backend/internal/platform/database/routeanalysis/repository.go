@@ -3,6 +3,7 @@ package routeanalysis
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/doveva/Gulyaem/backend/internal/geo/domain"
@@ -54,8 +55,12 @@ func (repository *Repository) CandidateSegments(
 }
 
 func (repository *Repository) CoverageSegments(
-	ctx context.Context, cityID string, route json.RawMessage, radius, contextRadius float64,
+	ctx context.Context, cityID string, fragments []geoanalysis.NormalizedRouteFragment, radius, contextRadius float64,
 ) ([]geoanalysis.CandidateSegment, error) {
+	contextRoute, err := fragmentGeometryJSON(fragments)
+	if err != nil {
+		return nil, err
+	}
 	tx, err := repository.database.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin route coverage query: %w", err)
@@ -64,27 +69,111 @@ func (repository *Repository) CoverageSegments(
 	rows, err := tx.Query(ctx, `
 		WITH route AS (
 			SELECT ST_SetSRID(ST_GeomFromGeoJSON($2), 4326) AS geometry
-		), halo AS (
-			SELECT ST_Buffer(geometry::geography, $3)::geometry AS geometry FROM route
 		)
 		SELECT ss.id, ST_AsGeoJSON(ss.geometry), ss.length_m, ss.classification, ss.attributes,
-		       CASE WHEN ss.classification = 'EXPLORE' THEN
-		         ST_Length(ST_CollectionExtract(ST_Intersection(ss.geometry, halo.geometry), 2)::geography)
-		       ELSE 0 END
+		       0::double precision
 		FROM street_segments ss
 		JOIN geo_data_versions gdv ON gdv.id = ss.geo_data_version_id AND gdv.status = 'READY'
 		CROSS JOIN route
-		CROSS JOIN halo
 		WHERE ss.city_id = $1
 		  AND ss.classification IN ('EXPLORE', 'ROUTABLE_ONLY')
-		  AND ST_DWithin(ss.geometry::geography, route.geometry::geography, $4)
+		  AND ST_DWithin(ss.geometry::geography, route.geometry::geography, $3)
 		ORDER BY ss.id
-	`, cityID, string(route), radius, contextRadius)
+	`, cityID, string(contextRoute), contextRadius)
 	if err != nil {
 		return nil, fmt.Errorf("query route coverage: %w", err)
 	}
-	defer rows.Close()
-	return scanSegments(rows)
+	candidates, err := scanSegments(rows)
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	fragmentsByGrade := make(map[string][]geoanalysis.NormalizedRouteFragment)
+	for _, fragment := range fragments {
+		fragmentsByGrade[fragment.GradeSignature] = append(fragmentsByGrade[fragment.GradeSignature], fragment)
+	}
+	candidateIDsByGrade := make(map[string][]string)
+	candidateByID := make(map[string]*geoanalysis.CandidateSegment, len(candidates))
+	for index := range candidates {
+		candidate := &candidates[index]
+		candidateByID[candidate.ID] = candidate
+		if candidate.Classification == domain.StreetSegmentExplore {
+			grade := geoanalysis.GradeSignature(candidate.Attributes)
+			candidateIDsByGrade[grade] = append(candidateIDsByGrade[grade], candidate.ID)
+		}
+	}
+	for grade, gradeFragments := range fragmentsByGrade {
+		candidateIDs := candidateIDsByGrade[grade]
+		if len(candidateIDs) == 0 {
+			continue
+		}
+		gradeRoute, encodeErr := fragmentGeometryJSON(gradeFragments)
+		if encodeErr != nil {
+			return nil, encodeErr
+		}
+		coverageRows, queryErr := tx.Query(ctx, `
+			WITH route AS (
+				SELECT ST_SetSRID(ST_GeomFromGeoJSON($2), 4326) AS geometry
+			), halo AS (
+				SELECT ST_Buffer(geometry::geography, $3)::geometry AS geometry FROM route
+			)
+			SELECT ss.id,
+			       ST_Length(ST_CollectionExtract(ST_Intersection(ss.geometry, halo.geometry), 2)::geography)
+			FROM street_segments ss
+			JOIN geo_data_versions gdv ON gdv.id = ss.geo_data_version_id AND gdv.status = 'READY'
+			CROSS JOIN halo
+			WHERE ss.city_id = $1
+			  AND ss.classification = 'EXPLORE'
+			  AND ss.id::text = ANY($4::text[])
+			ORDER BY ss.id
+		`, cityID, string(gradeRoute), radius, candidateIDs)
+		if queryErr != nil {
+			return nil, fmt.Errorf("query route coverage for grade %q: %w", grade, queryErr)
+		}
+		for coverageRows.Next() {
+			var segmentID string
+			var coveredMeters float64
+			if scanErr := coverageRows.Scan(&segmentID, &coveredMeters); scanErr != nil {
+				coverageRows.Close()
+				return nil, fmt.Errorf("scan route coverage for grade %q: %w", grade, scanErr)
+			}
+			if candidate := candidateByID[segmentID]; candidate != nil {
+				candidate.RadiusCoveredMeters = coveredMeters
+			}
+		}
+		if rowsErr := coverageRows.Err(); rowsErr != nil {
+			coverageRows.Close()
+			return nil, fmt.Errorf("iterate route coverage for grade %q: %w", grade, rowsErr)
+		}
+		coverageRows.Close()
+	}
+	return candidates, nil
+}
+
+func fragmentGeometryJSON(fragments []geoanalysis.NormalizedRouteFragment) (json.RawMessage, error) {
+	coordinates := make([][][2]float64, 0, len(fragments))
+	for _, fragment := range fragments {
+		if len(fragment.Geometry) < 2 {
+			continue
+		}
+		line := make([][2]float64, len(fragment.Geometry))
+		for index, point := range fragment.Geometry {
+			line[index] = [2]float64{point.Lon, point.Lat}
+		}
+		coordinates = append(coordinates, line)
+	}
+	if len(coordinates) == 0 {
+		return nil, errors.New("route coverage requires at least one normalized fragment")
+	}
+	result, err := json.Marshal(struct {
+		Type        string         `json:"type"`
+		Coordinates [][][2]float64 `json:"coordinates"`
+	}{Type: "MultiLineString", Coordinates: coordinates})
+	if err != nil {
+		return nil, fmt.Errorf("encode route coverage fragments: %w", err)
+	}
+	return result, nil
 }
 
 func scanSegments(queryRows pgx.Rows) ([]geoanalysis.CandidateSegment, error) {

@@ -153,3 +153,11 @@ func multiLineGeometryJSON(lines [][]domain.Point) json.RawMessage {
 	}{Type: "MultiLineString", Coordinates: coordinates})
 	return result
 }
+
+func normalizedRouteGeometryJSON(fragments []NormalizedRouteFragment) json.RawMessage {
+	lines := make([][]domain.Point, len(fragments))
+	for index, fragment := range fragments {
+		lines[index] = fragment.Geometry
+	}
+	return multiLineGeometryJSON(lines)
+}

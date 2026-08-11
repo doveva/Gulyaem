@@ -81,10 +81,15 @@ type segmentDetailResponse struct {
 	LengthMeters         float64                            `json:"lengthMeters"`
 	Classification       domain.StreetSegmentClassification `json:"classification"`
 	ReasonCode           string                             `json:"reasonCode"`
-	NormalizedAttributes map[string]any                     `json:"normalizedAttributes"`
+	Normalization        segmentNormalizationResponse       `json:"normalization"`
 	Street               *segmentStreetResponse             `json:"street"`
 	Districts            []querying.DistrictSummary         `json:"districts"`
 	DebugSource          *segmentDebugSource                `json:"debugSource,omitempty"`
+}
+
+type segmentNormalizationResponse struct {
+	BoundaryClipped bool     `json:"boundaryClipped"`
+	Warnings        []string `json:"warnings"`
 }
 
 type districtFeatureCollection struct {
@@ -358,8 +363,12 @@ func detailResponse(segment querying.Segment, includeDebug bool) segmentDetailRe
 		VersionStatus: segment.VersionStatus, NormalizationVersion: segment.NormalizationVersion,
 		IsCurrent: segment.IsCurrent, Geometry: segment.GeometryJSON,
 		LengthMeters: segment.LengthMeters, Classification: segment.Classification,
-		ReasonCode:           segment.Attributes.ReasonCode,
-		NormalizedAttributes: normalizedAttributes(segment.Attributes), Street: street,
+		ReasonCode: segment.Attributes.ReasonCode,
+		Normalization: segmentNormalizationResponse{
+			BoundaryClipped: segment.Attributes.BoundaryClip,
+			Warnings:        append([]string{}, segment.Attributes.Warnings...),
+		},
+		Street:    street,
 		Districts: segment.Districts,
 	}
 	if includeDebug {
@@ -369,25 +378,6 @@ func detailResponse(segment querying.Segment, includeDebug bool) segmentDetailRe
 		}
 	}
 	return response
-}
-
-func normalizedAttributes(attributes domain.StreetSegmentAttributes) map[string]any {
-	result := make(map[string]any)
-	for _, key := range []string{
-		"highway", "footway", "service", "surface", "access", "foot", "sidewalk",
-		"bridge", "tunnel", "indoor", "level", "oneway:foot", "foot:forward", "foot:backward",
-	} {
-		if value := attributes.SourceTags[key]; value != "" {
-			result[key] = value
-		}
-	}
-	if attributes.BoundaryClip {
-		result["boundaryClip"] = true
-	}
-	if len(attributes.Warnings) > 0 {
-		result["warnings"] = attributes.Warnings
-	}
-	return result
 }
 
 func handleGeoError(response http.ResponseWriter, deps Dependencies, err error) {

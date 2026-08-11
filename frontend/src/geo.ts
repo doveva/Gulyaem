@@ -62,7 +62,10 @@ export interface SegmentDetail {
   lengthMeters: number
   classification: Classification
   reasonCode: string
-  normalizedAttributes: Record<string, unknown>
+  normalization: {
+    boundaryClipped: boolean
+    warnings: string[]
+  }
   street: { id: string; name: string | null } | null
   districts: Array<{
     id: string

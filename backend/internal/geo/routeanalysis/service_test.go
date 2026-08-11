@@ -1,11 +1,26 @@
 package routeanalysis
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 
 	"github.com/doveva/Gulyaem/backend/internal/geo/domain"
 )
+
+func TestCoverageRadiusSupportedRange(t *testing.T) {
+	request := AnalyzeRequest{Matching: DefaultMatchingParameters(), Coverage: CoverageProfile{
+		Name: "custom", RadiusMeters: MaxCoverageRadiusMeters,
+		CoverageRatio: .6, MinRequiredMeters: 15, MaxRequiredMeters: 80,
+	}}
+	if err := validateAnalyzeRequest(request); err != nil {
+		t.Fatalf("maximum supported radius rejected: %v", err)
+	}
+	request.Coverage.RadiusMeters = MaxCoverageRadiusMeters + 1
+	if err := validateAnalyzeRequest(request); !errors.Is(err, ErrInvalidParameters) {
+		t.Fatalf("radius above supported range error = %v", err)
+	}
+}
 
 func TestCommittedFixtureContainsFiveValidationRoutes(t *testing.T) {
 	set, err := loadFixtureSet(filepath.Join("..", "..", "..", "..", "data"))
@@ -59,16 +74,40 @@ func TestCoverageUsesThresholdAndKeepsConnectorSeparate(t *testing.T) {
 	}
 }
 
-func TestCoverageDoesNotCrossGradeSignature(t *testing.T) {
-	candidates := []CandidateSegment{
-		{ID: "surface", LengthMeters: 100, RadiusCoveredMeters: 100, Classification: domain.StreetSegmentExplore},
-		{ID: "tunnel", LengthMeters: 100, RadiusCoveredMeters: 100, Classification: domain.StreetSegmentExplore,
-			Attributes: domain.StreetSegmentAttributes{SourceTags: map[string]string{"tunnel": "yes", "level": "-1"}}},
+func TestMixedGradeRouteKeepsCoverageLocal(t *testing.T) {
+	surface := &CandidateSegment{ID: "surface-a", LengthMeters: 100, Classification: domain.StreetSegmentExplore}
+	tunnelAttributes := domain.StreetSegmentAttributes{SourceTags: map[string]string{"tunnel": "yes", "level": "-1"}}
+	tunnel := &CandidateSegment{ID: "tunnel-b", LengthMeters: 100, Classification: domain.StreetSegmentExplore, Attributes: tunnelAttributes}
+	samples := []routeSample{
+		{point: domain.Point{Lon: 30, Lat: 60}, measure: 0},
+		{point: domain.Point{Lon: 30.001, Lat: 60}, measure: 50},
+		{point: domain.Point{Lon: 30.01, Lat: 60}, measure: 500},
+		{point: domain.Point{Lon: 30.011, Lat: 60}, measure: 550},
 	}
-	coverage, _ := calculateCoverage(candidates, map[string][][2]float64{"surface": {{0, 20}}}, CoverageProfiles["balanced"])
+	matches := []sampleMatch{
+		{segment: surface, nearest: nearestPoint{point: samples[0].point, measure: 0}},
+		{segment: surface, nearest: nearestPoint{point: samples[1].point, measure: 50}},
+		{segment: tunnel, nearest: nearestPoint{point: samples[2].point, measure: 0}},
+		{segment: tunnel, nearest: nearestPoint{point: samples[3].point, measure: 50}},
+	}
+	_, _, fragments, direct, _ := assembleMatchResult(samples, matches, 5)
+	if len(fragments) != 2 || fragments[0].GradeSignature != "surface" ||
+		fragments[1].GradeSignature != "surface;tunnel=yes;level=-1" {
+		t.Fatalf("normalized fragments = %+v", fragments)
+	}
+
+	candidates := []CandidateSegment{
+		{ID: "surface-a", LengthMeters: 100, RadiusCoveredMeters: 100, Classification: domain.StreetSegmentExplore},
+		{ID: "parallel-tunnel-a", LengthMeters: 100, Classification: domain.StreetSegmentExplore, Attributes: tunnelAttributes},
+		{ID: "tunnel-b", LengthMeters: 100, RadiusCoveredMeters: 100, Classification: domain.StreetSegmentExplore, Attributes: tunnelAttributes},
+	}
+	coverage, _ := calculateCoverage(candidates, direct, CoverageProfiles["balanced"])
+	statuses := make(map[string]string)
 	for _, segment := range coverage {
-		if segment.SegmentID == "tunnel" && segment.CoveredMeters != 0 {
-			t.Fatalf("tunnel covered meters = %f", segment.CoveredMeters)
-		}
+		statuses[segment.SegmentID] = segment.Status
+	}
+	if statuses["surface-a"] != "COMPLETED" || statuses["parallel-tunnel-a"] != "NOT_COVERED" ||
+		statuses["tunnel-b"] != "COMPLETED" {
+		t.Fatalf("mixed-grade statuses = %v", statuses)
 	}
 }

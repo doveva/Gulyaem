@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "fixture": "spb-stage1-validation",
+  "viewports": [
+    {
+      "id": "dense-center",
+      "sourceAreaId": "dense-center",
+      "description": "Dense center: Nevsky, Admiralteyskaya, courtyards and canals",
+      "bbox": {"west": 30.3000, "south": 59.9300, "east": 30.3300, "north": 59.9450}
+    },
+    {
+      "id": "kalininsky-akademicheskaya",
+      "sourceAreaId": "kalininsky-corridor",
+      "description": "Regular urban network around Akademicheskaya and the southern corridor",
+      "bbox": {"west": 30.3850, "south": 60.0060, "east": 30.4100, "north": 60.0240}
+    },
+    {
+      "id": "sosnovka-south-east",
+      "sourceAreaId": "sosnovka-park",
+      "description": "Sosnovka footways, service roads and residential edge",
+      "bbox": {"west": 30.3380, "south": 60.0120, "east": 30.3630, "north": 60.0300}
+    }
+  ]
+}

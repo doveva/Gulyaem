@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -211,6 +212,39 @@ func TestSegmentDebugSourceIsHiddenInProduction(t *testing.T) {
 				t.Fatalf("debug source = %+v", body.DebugSource)
 			}
 		})
+	}
+}
+
+func TestSegmentDetailKeepsOSMVocabularyOutOfNormalization(t *testing.T) {
+	segment := querying.Segment{
+		ID: testSegmentID, CityID: testCityID, GeoDataVersionID: testVersionID,
+		GeometryJSON:   json.RawMessage(`{"type":"LineString","coordinates":[[30.31,59.93],[30.32,59.94]]}`),
+		LengthMeters:   42.5,
+		Classification: domain.StreetSegmentExplore,
+		Attributes: domain.StreetSegmentAttributes{
+			ReasonCode: "pedestrian_highway", SourceTags: map[string]string{"highway": "footway", "surface": "paving_stones"},
+			BoundaryClip: true, Warnings: []string{"boundary_clip"},
+		},
+		VersionStatus: domain.GeoDataVersionReady, NormalizationVersion: "stage1-segments-v1",
+	}
+	response := httptest.NewRecorder()
+	testGeoHandler(&geoRepositoryStub{segment: segment}, "test").ServeHTTP(response,
+		httptest.NewRequest(http.MethodGet, "/api/v1/geo/segments/"+testSegmentID, nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
+	}
+	if bytes.Contains(response.Body.Bytes(), []byte(`"normalizedAttributes"`)) ||
+		bytes.Contains(response.Body.Bytes(), []byte(`"highway":`)) ||
+		bytes.Contains(response.Body.Bytes(), []byte(`"surface":`)) {
+		t.Fatalf("ordinary detail leaks OSM vocabulary: %s", response.Body.String())
+	}
+	var body segmentDetailResponse
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if !body.Normalization.BoundaryClipped || len(body.Normalization.Warnings) != 1 ||
+		body.Normalization.Warnings[0] != "boundary_clip" {
+		t.Fatalf("normalization = %+v", body.Normalization)
 	}
 }
 

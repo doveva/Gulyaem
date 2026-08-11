@@ -25,7 +25,7 @@ OpenFreeMap Liberty style and can be replaced without code changes.
 - open `/debug/geo` at the committed dense-center fixture;
 - toggle `EXPLORE`, `ROUTABLE_ONLY`, `IGNORE`, districts, the base map and endpoint markers independently;
 - filter by length and compare viewport count/length distributions;
-- select a segment and inspect its version, reason code and normalized attributes;
+- select a segment and inspect its version, reason code and typed normalization metadata;
 - select a district and inspect its kind and source version; segment detail shows all intersecting districts;
 - choose one of five routes, run a profile and inspect matched/unmatched and coverage segments;
 - opt into source OSM metadata in non-production environments.
@@ -34,13 +34,20 @@ OpenFreeMap Liberty style and can be replaced without code changes.
 ## Structure
 
 ```text
-src/App.tsx       application shell and map lifecycle
-src/geo.ts        GeoJSON/API models and pure viewport helpers
-src/routeAnalysis.ts sample-route API models and GeoJSON layer adapters
-src/routingComparison.ts routing-spike report models and engine overlay adapters
-src/styles.css    mobile-first debug UI
-Dockerfile        production static build
-nginx.conf        SPA fallback and container health endpoint
+src/App.tsx                         route-level application shell
+src/geoPlayground/GeoPlayground.tsx feature composition and cross-panel state
+src/geoPlayground/GeoMap.tsx        MapLibre lifecycle, sources, layers and map events
+src/geoPlayground/useViewportData.ts debounced/abortable bbox data lifecycle
+src/geoPlayground/LayerControls.tsx layer toggles, filters and viewport statistics
+src/geoPlayground/SegmentInspector.tsx segment/district/coverage detail UI
+src/geoPlayground/RouteAnalysisPanel.tsx sample routes and coverage analysis
+src/geoPlayground/RoutingComparisonPanel.tsx Stage 1.6 engine comparison
+src/geo.ts                          GeoJSON/API models and pure viewport helpers
+src/routeAnalysis.ts                sample-route models and layer adapters
+src/routingComparison.ts            routing report models and layer adapters
+src/styles.css                      mobile-first debug UI
+Dockerfile                          production static build
+nginx.conf                          SPA fallback and container health endpoint
 ```
 
 ## Run and verify
@@ -53,8 +60,10 @@ npm run dev
 ```
 
 Open `http://localhost:5173/debug/geo`. Run `npm run lint`, `npm test` and `npm run build` before
-hand-off. Vite dependency pre-bundling excludes `maplibre-gl` for local development; the production
-build emits its worker as an explicit hashed asset and configures MapLibre with that URL.
+hand-off. With the local API and fixture running, install the pinned browser once with
+`npx playwright install chromium` and run `npm run test:e2e`. Vite dependency pre-bundling excludes
+`maplibre-gl` for local development; the production build emits its worker as an explicit hashed
+asset and configures MapLibre with that URL.
 
 ## Configuration
 
@@ -72,7 +81,8 @@ the browser. The UI overlays source/normalized routes, unmatched fragments, conn
 completed/partial/not-covered segments and compares coverage profiles. Viewport requests are
 debounced by 250 ms and stale requests are aborted. The API may ask the user to zoom in when the
 viewport is larger than 25 km² or contains more than 10,000 segments; the UI does not silently
-truncate data.
+truncate data. Ordinary segment detail exposes typed normalization metadata only; raw OSM tags are
+available exclusively through the non-production debug source.
 
 ## Related documents
 
@@ -82,3 +92,4 @@ truncate data.
 - [`District data ADR`](../docs/adr/0004-versioned-administrative-districts.md)
 - [`Route matching and coverage ADR`](../docs/adr/0005-sample-route-matching-and-radius-coverage.md)
 - [`Routing engine ADR`](../docs/adr/0006-routing-engine-valhalla.md)
+- [`Stage 1 validation report`](../docs/stage%201/validation-report.md)

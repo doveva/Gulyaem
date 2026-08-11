@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"strings"
 
 	"github.com/doveva/Gulyaem/backend/internal/geo/domain"
 	"github.com/doveva/Gulyaem/backend/internal/geo/querying"
@@ -88,7 +87,7 @@ func (service *Service) analyze(ctx context.Context, cityID string, route Route,
 	coverageCandidates := []CandidateSegment{}
 	if len(normalized) > 0 {
 		coverageCandidates, err = service.repository.CoverageSegments(
-			ctx, cityID, multiLineGeometryJSON(normalized), request.Coverage.RadiusMeters, AnalysisContextRadiusMeters,
+			ctx, cityID, normalized, request.Coverage.RadiusMeters, AnalysisContextRadiusMeters,
 		)
 		if err != nil {
 			return Analysis{}, err
@@ -105,7 +104,7 @@ func (service *Service) analyze(ctx context.Context, cityID string, route Route,
 		Warnings: service.versionWarnings(version.SourceChecksum, version.NormalizationVersion),
 		Matching: request.Matching, CoverageProfile: request.Coverage,
 		ContextRadiusMeters: AnalysisContextRadiusMeters,
-		SourceRoute:         route.Geometry, NormalizedRoute: multiLineGeometryJSON(normalized),
+		SourceRoute:         route.Geometry, NormalizedRoute: normalizedRouteGeometryJSON(normalized),
 		MatchedFragments: matched, UnmatchedFragments: unmatched,
 		CoverageSegments: coverage, Metrics: metrics,
 	}, nil
@@ -138,7 +137,8 @@ func validateAnalyzeRequest(request AnalyzeRequest) error {
 		matching.EndpointToleranceMeters <= 0 || matching.EndpointToleranceMeters > 10 {
 		return fmt.Errorf("%w: matching parameters are outside supported ranges", ErrInvalidParameters)
 	}
-	if coverage.RadiusMeters < 5 || coverage.RadiusMeters > 50 || coverage.CoverageRatio <= 0 || coverage.CoverageRatio > 1 ||
+	if coverage.RadiusMeters < MinCoverageRadiusMeters || coverage.RadiusMeters > MaxCoverageRadiusMeters ||
+		coverage.CoverageRatio <= 0 || coverage.CoverageRatio > 1 ||
 		coverage.MinRequiredMeters < 0 || coverage.MaxRequiredMeters <= 0 || coverage.MinRequiredMeters > coverage.MaxRequiredMeters {
 		return fmt.Errorf("%w: coverage parameters are outside supported ranges", ErrInvalidParameters)
 	}
@@ -153,7 +153,7 @@ type sampleMatch struct {
 }
 
 func matchRoute(points []domain.Point, candidates []CandidateSegment, parameters MatchingParameters) (
-	[]MatchedFragment, []UnmatchedFragment, [][]domain.Point, map[string][][2]float64, float64,
+	[]MatchedFragment, []UnmatchedFragment, []NormalizedRouteFragment, map[string][][2]float64, float64,
 ) {
 	samples := densify(points, parameters.SampleStepMeters)
 	matches := make([]sampleMatch, len(samples))
@@ -236,11 +236,11 @@ func continuity(previous, candidate *CandidateSegment, parameters MatchingParame
 }
 
 func assembleMatchResult(samples []routeSample, matches []sampleMatch, sampleStep float64) (
-	[]MatchedFragment, []UnmatchedFragment, [][]domain.Point, map[string][][2]float64, float64,
+	[]MatchedFragment, []UnmatchedFragment, []NormalizedRouteFragment, map[string][][2]float64, float64,
 ) {
 	matchedFragments := make([]MatchedFragment, 0)
 	unmatchedFragments := make([]UnmatchedFragment, 0)
-	normalized := make([][]domain.Point, 0)
+	normalized := make([]NormalizedRouteFragment, 0)
 	direct := make(map[string][][2]float64)
 	matchedMeters := 0.0
 	for index := 1; index < len(samples); index++ {
@@ -305,17 +305,20 @@ func assembleMatchResult(samples []routeSample, matches []sampleMatch, sampleSte
 		if start == len(samples) {
 			break
 		}
+		grade := GradeSignature(matches[start].segment.Attributes)
 		end := start + 1
-		for end < len(samples) && matches[end].segment != nil {
+		for end < len(samples) && matches[end].segment != nil &&
+			GradeSignature(matches[end].segment.Attributes) == grade {
 			end++
 		}
 		line := make([]domain.Point, 0, end-start)
 		for index := start; index < end; index++ {
 			line = append(line, matches[index].nearest.point)
 		}
-		if len(line) >= 2 {
-			normalized = append(normalized, line)
+		if len(line) == 1 {
+			line = append(line, line[0])
 		}
+		normalized = append(normalized, NormalizedRouteFragment{Geometry: line, GradeSignature: grade})
 		start = end
 	}
 	return matchedFragments, unmatchedFragments, normalized, direct, matchedMeters
@@ -332,18 +335,9 @@ func samplePoints(samples []routeSample) []domain.Point {
 func calculateCoverage(candidates []CandidateSegment, directIntervals map[string][][2]float64, profile CoverageProfile) ([]CoverageSegment, Metrics) {
 	result := make([]CoverageSegment, 0, len(candidates))
 	metrics := Metrics{}
-	directGrades := make(map[string]bool)
-	for _, candidate := range candidates {
-		if len(directIntervals[candidate.ID]) > 0 {
-			directGrades[gradeSignature(candidate.Attributes)] = true
-		}
-	}
 	for _, candidate := range candidates {
 		directMeters := mergedIntervalLength(directIntervals[candidate.ID])
 		coveredMeters := candidate.RadiusCoveredMeters
-		if directMeters == 0 && len(directGrades) > 0 && !directGrades[gradeSignature(candidate.Attributes)] {
-			coveredMeters = 0
-		}
 		coveredMeters = math.Min(candidate.LengthMeters, math.Max(directMeters, coveredMeters))
 		if candidate.Classification == domain.StreetSegmentRoutableOnly {
 			if directMeters > 0 {
@@ -403,15 +397,4 @@ func mergedIntervalLength(intervals [][2]float64) float64 {
 		start, end = interval[0], interval[1]
 	}
 	return total + end - start
-}
-
-func gradeSignature(attributes domain.StreetSegmentAttributes) string {
-	tags := attributes.SourceTags
-	parts := []string{"surface"}
-	for _, key := range []string{"bridge", "tunnel", "indoor", "level"} {
-		if value := strings.TrimSpace(tags[key]); value != "" && value != "no" && value != "0" {
-			parts = append(parts, key+"="+value)
-		}
-	}
-	return strings.Join(parts, ";")
 }

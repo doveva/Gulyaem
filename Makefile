@@ -48,11 +48,13 @@ export DISTRICT_NORMALIZATION_VERSION
 export VALHALLA_PORT GRAPHHOPPER_PORT OSRM_PORT VALHALLA_URL GRAPHHOPPER_URL OSRM_URL
 
 .PHONY: bootstrap db-up migrate geo-import district-import api frontend up down logs check docs-check \
-	routing-prepare routing-images routing-up routing-benchmark routing-down routing-reset routing-spike
+	routing-prepare routing-images routing-up routing-benchmark routing-down routing-reset routing-spike \
+	stage1-e2e stage1-validate stage1-freeze-check
 
 bootstrap:
 	cd backend && go mod download
 	cd frontend && npm ci
+	cd frontend && npx playwright install chromium
 
 db-up:
 	docker compose up -d db
@@ -98,6 +100,17 @@ check:
 docs-check:
 	python3 scripts/docs/docs.py index --check
 	python3 scripts/docs/docs.py check
+
+stage1-e2e:
+	cd frontend && npm run test:e2e
+
+stage1-validate:
+	python3 scripts/validation/stage1.py \
+		--root "$(CURDIR)" \
+		--api-url "$(VITE_API_URL)" \
+		--output "data/validation/spb-stage1/report.json"
+
+stage1-freeze-check: check stage1-e2e stage1-validate
 
 routing-prepare:
 	./scripts/routing/prepare.sh

@@ -31,11 +31,16 @@ OSM parser types are isolated in `internal/platform/osm`; raw OSM entities are n
 - `GET /api/v1/cities/{cityId}/geo-version` returns the current `READY` version.
 - `GET /api/v1/geo/segments` returns filtered GeoJSON for a bounded viewport with statistics.
 - `GET /api/v1/geo/segments/{segmentId}` returns current or historical segment details; source OSM
-  metadata requires `debug=true` and is disabled in production.
+  metadata requires `debug=true` and is disabled in production. The ordinary response exposes only
+  typed `normalization.boundaryClipped` and `normalization.warnings`, never raw OSM tag keys.
 - `GET /api/v1/geo/districts` returns the current district layer for a bounded viewport.
 - `GET /api/v1/geo/sample-routes` lists version-aware Stage 1.5 route fixtures.
 - `POST /api/v1/geo/sample-routes/{routeId}/analyze` returns normalized/matched/unmatched geometry,
   exact coverage, provenance and metrics for a selected profile.
+  Strict/Balanced/Generous use radii `35/50/100 м`; custom accepts `5–200 м`. Coverage is evaluated
+  inside a fixed `225 м` analysis context so the maximum custom radius is not clipped. A normalized
+  route is split at unmatched gaps and grade changes; PostGIS buffers each grade separately and
+  intersects it only with compatible segment IDs.
 - `cmd/geo-import` verifies the fixture checksum, builds segments in memory and atomically publishes
   them with a version.
 - `cmd/district-import` verifies the GeoJSON fixture and atomically publishes an independent
@@ -163,3 +168,4 @@ Docker Desktop comparisons, not production sizing.
 - [`ADR-0004`](../docs/adr/0004-versioned-administrative-districts.md)
 - [`ADR-0005`](../docs/adr/0005-sample-route-matching-and-radius-coverage.md)
 - [`ADR-0006`](../docs/adr/0006-routing-engine-valhalla.md)
+- [`ADR-0008`](../docs/adr/0008-coverage-parameters-stage1-freeze.md)

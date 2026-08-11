@@ -27,6 +27,7 @@ README. Street graph fixtures live below `test-areas`; district fixtures live be
 Curated immutable walking lines used by analysis experiments live below `sample-routes`.
 The shared routing-engine benchmark contract, waypoint selection and pinned engine versions live
 below `routing-spike`; generated graphs do not belong in this directory.
+Stage 1.7 representative viewports and generated validation evidence live below `validation`.
 
 ## Run and verify
 

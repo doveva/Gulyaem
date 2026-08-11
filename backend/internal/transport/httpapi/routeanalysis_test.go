@@ -8,7 +8,7 @@ func TestResolveAnalyzeRequestUsesBalancedDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	if request.Matching.SampleStepMeters != 5 || request.Matching.CandidateRadiusMeters != 12 ||
-		request.Coverage.Name != "balanced" || request.Coverage.RadiusMeters != 20 {
+		request.Coverage.Name != "balanced" || request.Coverage.RadiusMeters != 50 {
 		t.Fatalf("request = %+v", request)
 	}
 }
