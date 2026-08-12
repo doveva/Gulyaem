@@ -28,7 +28,7 @@ func (repository *Repository) CurrentVersion(ctx context.Context, cityID string)
 }
 
 func (repository *Repository) CandidateSegments(
-	ctx context.Context, cityID string, route json.RawMessage, contextRadius float64,
+	ctx context.Context, cityID, geoDataVersionID string, route json.RawMessage, contextRadius float64,
 ) ([]geoanalysis.CandidateSegment, error) {
 	tx, err := repository.database.Begin(ctx)
 	if err != nil {
@@ -36,17 +36,17 @@ func (repository *Repository) CandidateSegments(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	rows, err := tx.Query(ctx, `
-		WITH route AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON($2), 4326) AS geometry)
+		WITH route AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON($3), 4326) AS geometry)
 		SELECT ss.id, ST_AsGeoJSON(ss.geometry), ss.length_m, ss.classification,
 		       ss.attributes, 0::double precision
 		FROM street_segments ss
-		JOIN geo_data_versions gdv ON gdv.id = ss.geo_data_version_id AND gdv.status = 'READY'
 		CROSS JOIN route
 		WHERE ss.city_id = $1
+		  AND ss.geo_data_version_id = $2
 		  AND ss.classification IN ('EXPLORE', 'ROUTABLE_ONLY')
-		  AND ST_DWithin(ss.geometry::geography, route.geometry::geography, $3)
+		  AND ST_DWithin(ss.geometry::geography, route.geometry::geography, $4)
 		ORDER BY ss.id
-	`, cityID, string(route), contextRadius)
+	`, cityID, geoDataVersionID, string(route), contextRadius)
 	if err != nil {
 		return nil, fmt.Errorf("query route match candidates: %w", err)
 	}
@@ -55,7 +55,8 @@ func (repository *Repository) CandidateSegments(
 }
 
 func (repository *Repository) CoverageSegments(
-	ctx context.Context, cityID string, fragments []geoanalysis.NormalizedRouteFragment, radius, contextRadius float64,
+	ctx context.Context, cityID, geoDataVersionID string,
+	fragments []geoanalysis.NormalizedRouteFragment, radius, contextRadius float64,
 ) ([]geoanalysis.CandidateSegment, error) {
 	contextRoute, err := fragmentGeometryJSON(fragments)
 	if err != nil {
@@ -68,18 +69,18 @@ func (repository *Repository) CoverageSegments(
 	defer func() { _ = tx.Rollback(ctx) }()
 	rows, err := tx.Query(ctx, `
 		WITH route AS (
-			SELECT ST_SetSRID(ST_GeomFromGeoJSON($2), 4326) AS geometry
+			SELECT ST_SetSRID(ST_GeomFromGeoJSON($3), 4326) AS geometry
 		)
 		SELECT ss.id, ST_AsGeoJSON(ss.geometry), ss.length_m, ss.classification, ss.attributes,
 		       0::double precision
 		FROM street_segments ss
-		JOIN geo_data_versions gdv ON gdv.id = ss.geo_data_version_id AND gdv.status = 'READY'
 		CROSS JOIN route
 		WHERE ss.city_id = $1
+		  AND ss.geo_data_version_id = $2
 		  AND ss.classification IN ('EXPLORE', 'ROUTABLE_ONLY')
-		  AND ST_DWithin(ss.geometry::geography, route.geometry::geography, $3)
+		  AND ST_DWithin(ss.geometry::geography, route.geometry::geography, $4)
 		ORDER BY ss.id
-	`, cityID, string(contextRoute), contextRadius)
+	`, cityID, geoDataVersionID, string(contextRoute), contextRadius)
 	if err != nil {
 		return nil, fmt.Errorf("query route coverage: %w", err)
 	}
@@ -114,20 +115,20 @@ func (repository *Repository) CoverageSegments(
 		}
 		coverageRows, queryErr := tx.Query(ctx, `
 			WITH route AS (
-				SELECT ST_SetSRID(ST_GeomFromGeoJSON($2), 4326) AS geometry
+				SELECT ST_SetSRID(ST_GeomFromGeoJSON($3), 4326) AS geometry
 			), halo AS (
-				SELECT ST_Buffer(geometry::geography, $3)::geometry AS geometry FROM route
+				SELECT ST_Buffer(geometry::geography, $4)::geometry AS geometry FROM route
 			)
 			SELECT ss.id,
 			       ST_Length(ST_CollectionExtract(ST_Intersection(ss.geometry, halo.geometry), 2)::geography)
 			FROM street_segments ss
-			JOIN geo_data_versions gdv ON gdv.id = ss.geo_data_version_id AND gdv.status = 'READY'
 			CROSS JOIN halo
 			WHERE ss.city_id = $1
+			  AND ss.geo_data_version_id = $2
 			  AND ss.classification = 'EXPLORE'
-			  AND ss.id::text = ANY($4::text[])
+			  AND ss.id::text = ANY($5::text[])
 			ORDER BY ss.id
-		`, cityID, string(gradeRoute), radius, candidateIDs)
+		`, cityID, geoDataVersionID, string(gradeRoute), radius, candidateIDs)
 		if queryErr != nil {
 			return nil, fmt.Errorf("query route coverage for grade %q: %w", grade, queryErr)
 		}

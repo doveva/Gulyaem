@@ -1,8 +1,8 @@
 # Frontend
 
-React and TypeScript engineering UI for inspecting Gulyaem geo data. The responsive `/debug/geo`
-playground combines `StreetSegment`, districts, Stage 1.5 sample-route coverage and the static
-Stage 1.6 routing-engine comparison.
+React and TypeScript UI for Gulyaem. The product `/map` route builder creates stateless pedestrian
+route previews with potential exploration coverage; the responsive `/debug/geo` playground keeps
+the Stage 1 engineering and validation tools separate.
 
 ## Responsibility
 
@@ -13,6 +13,10 @@ Stage 1.6 routing-engine comparison.
 - render district fill, boundaries, labels and a minimal district inspector.
 - compare sample routes and coverage profiles and inspect coverage provenance.
 - compare Valhalla, GraphHopper and OSRM geometries, waypoints and benchmark summaries.
+- build a product route from start, destination and ordered intermediate waypoints;
+- recalculate only after discrete edits, cancel stale requests and preserve editable waypoints on errors;
+- render distance, duration and visually distinct potential COMPLETED/PARTIAL coverage without
+  personal-history language.
 
 ## Boundaries and dependencies
 
@@ -22,6 +26,8 @@ OpenFreeMap Liberty style and can be replaced without code changes.
 
 ## Main scenarios
 
+- open `/map`, choose **+ Прогулка**, tap start and destination, then inspect the route preview;
+- add, drag, remove or reorder intermediate waypoints and clear/restart the draft;
 - open `/debug/geo` at the committed dense-center fixture;
 - toggle `EXPLORE`, `ROUTABLE_ONLY`, `IGNORE`, districts, the base map and endpoint markers independently;
 - filter by length and compare viewport count/length distributions;
@@ -35,6 +41,9 @@ OpenFreeMap Liberty style and can be replaced without code changes.
 
 ```text
 src/App.tsx                         route-level application shell
+src/routeBuilder/RouteBuilder.tsx  product builder state and summary sheet
+src/routeBuilder/RouteBuilderMap.tsx MapLibre route, coverage and draggable markers
+src/routeBuilder/useRoutePreview.ts abortable route-preview lifecycle and stale response guard
 src/geoPlayground/GeoPlayground.tsx feature composition and cross-panel state
 src/geoPlayground/GeoMap.tsx        MapLibre lifecycle, sources, layers and map events
 src/geoPlayground/useViewportData.ts debounced/abortable bbox data lifecycle
@@ -59,7 +68,8 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173/debug/geo`. Run `npm run lint`, `npm test` and `npm run build` before
+Open `http://localhost:5173/map` for the product flow or `/debug/geo` for engineering tools. Run
+`npm run lint`, `npm test` and `npm run build` before
 hand-off. With the local API and fixture running, install the pinned browser once with
 `npx playwright install chromium` and run `npm run test:e2e`. Vite dependency pre-bundling excludes
 `maplibre-gl` for local development; the production build emits its worker as an explicit hashed
@@ -75,9 +85,9 @@ asset and configures MapLibre with that URL.
 
 ## Limitations and technical debt
 
-The playground has only stateless sample-route analysis, not a production Walk or cumulative
-progress model. Routing comparison reads a committed static report; it never calls engines from
-the browser. The UI overlays source/normalized routes, unmatched fragments, connectors and
+Stage 2 has no saved route, production Walk or cumulative progress model. The browser calls only
+the Go route-preview endpoint and never Valhalla directly. Routing comparison reads a committed
+static report. The debug UI overlays source/normalized routes, unmatched fragments, connectors and
 completed/partial/not-covered segments and compares coverage profiles. Viewport requests are
 debounced by 250 ms and stale requests are aborted. The API may ask the user to zoom in when the
 viewport is larger than 25 km² or contains more than 10,000 segments; the UI does not silently

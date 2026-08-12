@@ -8,15 +8,18 @@ import (
 )
 
 type Config struct {
-	DatabaseURL        string
-	HTTPAddress        string
-	Environment        string
-	GeoDataPath        string
-	GeoTestArea        string
-	DistrictTestArea   string
-	LogLevel           string
-	CORSAllowedOrigins []string
-	ShutdownTimeout    time.Duration
+	DatabaseURL                string
+	HTTPAddress                string
+	Environment                string
+	GeoDataPath                string
+	GeoTestArea                string
+	DistrictTestArea           string
+	LogLevel                   string
+	CORSAllowedOrigins         []string
+	ShutdownTimeout            time.Duration
+	ValhallaURL                string
+	RoutingTimeout             time.Duration
+	RoutingDatasetMetadataPath string
 }
 
 func Load() (Config, error) {
@@ -35,6 +38,11 @@ func Load() (Config, error) {
 		LogLevel:           strings.ToLower(envOrDefault("LOG_LEVEL", "info")),
 		CORSAllowedOrigins: splitCSV(envOrDefault("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000")),
 		ShutdownTimeout:    10 * time.Second,
+		ValhallaURL:        envOrDefault("VALHALLA_URL", "http://localhost:8002"),
+		RoutingTimeout:     8 * time.Second,
+		RoutingDatasetMetadataPath: envOrDefault(
+			"ROUTING_DATASET_METADATA_PATH", "../.routing/valhalla/routing-dataset.json",
+		),
 	}, nil
 }
 

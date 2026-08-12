@@ -24,6 +24,8 @@ VALHALLA_PORT ?= 8002
 GRAPHHOPPER_PORT ?= 8989
 OSRM_PORT ?= 5001
 VALHALLA_URL ?= http://localhost:$(VALHALLA_PORT)
+ROUTING_ENGINE_VERSION ?= 3.7.0
+ROUTING_DATASET_METADATA_PATH ?= $(CURDIR)/.routing/valhalla/routing-dataset.json
 GRAPHHOPPER_URL ?= http://localhost:$(GRAPHHOPPER_PORT)
 OSRM_URL ?= http://localhost:$(OSRM_PORT)
 
@@ -46,6 +48,7 @@ export DATABASE_URL HTTP_ADDRESS ENVIRONMENT LOG_LEVEL GEO_DATA_PATH GEO_TEST_AR
 export NORMALIZATION_VERSION MAX_SEGMENT_LENGTH_M CORS_ALLOWED_ORIGINS VITE_API_URL VITE_MAP_STYLE_URL CGO_ENABLED
 export DISTRICT_NORMALIZATION_VERSION
 export VALHALLA_PORT GRAPHHOPPER_PORT OSRM_PORT VALHALLA_URL GRAPHHOPPER_URL OSRM_URL
+export ROUTING_DATASET_METADATA_PATH ROUTING_ENGINE_VERSION
 
 .PHONY: bootstrap db-up migrate geo-import district-import api frontend up down logs check docs-check \
 	routing-prepare routing-images routing-up routing-benchmark routing-down routing-reset routing-spike \
@@ -83,6 +86,7 @@ frontend:
 	cd frontend && npm run dev
 
 up:
+	docker compose up -d --force-recreate routing-prepare valhalla routing-metadata
 	docker compose up --build -d
 
 down:
@@ -94,6 +98,7 @@ logs:
 check:
 	cd backend && GOCACHE=$(CURDIR)/.gocache go test ./... && GOCACHE=$(CURDIR)/.gocache go vet ./...
 	cd frontend && npm run lint && npm test && npm run build
+	./scripts/routing/prepare_test.sh
 	python3 scripts/docs/docs.py index --check
 	python3 scripts/docs/docs.py check
 

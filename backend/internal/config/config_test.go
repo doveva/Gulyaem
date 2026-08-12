@@ -13,6 +13,7 @@ func TestLoadAppliesDefaults(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://example")
 	t.Setenv("HTTP_ADDRESS", "")
 	t.Setenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173, http://localhost:3000")
+	t.Setenv("ROUTING_DATASET_METADATA_PATH", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -23,5 +24,8 @@ func TestLoadAppliesDefaults(t *testing.T) {
 	}
 	if len(cfg.CORSAllowedOrigins) != 2 {
 		t.Fatalf("CORSAllowedOrigins = %v", cfg.CORSAllowedOrigins)
+	}
+	if cfg.RoutingDatasetMetadataPath != "../.routing/valhalla/routing-dataset.json" {
+		t.Fatalf("RoutingDatasetMetadataPath = %q", cfg.RoutingDatasetMetadataPath)
 	}
 }

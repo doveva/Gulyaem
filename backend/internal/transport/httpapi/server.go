@@ -10,12 +10,17 @@ import (
 
 	"github.com/doveva/Gulyaem/backend/internal/geo/querying"
 	"github.com/doveva/Gulyaem/backend/internal/geo/routeanalysis"
+	"github.com/doveva/Gulyaem/backend/internal/routing/preview"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
 type HealthChecker interface {
 	Ping(context.Context) error
+}
+
+type ReadinessChecker interface {
+	Ready(context.Context) error
 }
 
 type Dependencies struct {
@@ -25,6 +30,9 @@ type Dependencies struct {
 	AllowedOrigins []string
 	Geo            *querying.Service
 	RouteAnalysis  *routeanalysis.Service
+	RoutePreview   *preview.Service
+	Routing        HealthChecker
+	RoutingDataset ReadinessChecker
 }
 
 func NewHandler(deps Dependencies) http.Handler {
@@ -33,6 +41,7 @@ func NewHandler(deps Dependencies) http.Handler {
 	router.Use(middleware.RealIP)
 	router.Use(middleware.Recoverer)
 	router.Use(requestLogger(deps.Logger))
+	router.Use(middleware.Compress(5, "application/json"))
 	router.Use(cors(deps.AllowedOrigins))
 
 	router.Get("/health/live", func(response http.ResponseWriter, _ *http.Request) {
@@ -49,10 +58,25 @@ func NewHandler(deps Dependencies) http.Handler {
 			writeJSON(response, http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
 			return
 		}
+		if deps.Routing != nil {
+			if err := deps.Routing.Ping(ctx); err != nil {
+				deps.Logger.Error("routing readiness check failed", "error", err)
+				writeJSON(response, http.StatusServiceUnavailable, map[string]string{"status": "routing unavailable"})
+				return
+			}
+		}
+		if deps.RoutingDataset != nil {
+			if err := deps.RoutingDataset.Ready(ctx); err != nil {
+				deps.Logger.Error("routing dataset readiness check failed", "error", err)
+				writeJSON(response, http.StatusServiceUnavailable, map[string]string{"status": "routing dataset incompatible"})
+				return
+			}
+		}
 		writeJSON(response, http.StatusOK, map[string]string{"status": "ready"})
 	})
 	registerGeoRoutes(router, deps)
 	registerRouteAnalysisRoutes(router, deps)
+	registerRoutePreviewRoutes(router, deps)
 
 	return router
 }

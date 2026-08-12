@@ -18,20 +18,34 @@ var (
 )
 
 type Service struct {
+	analyzer *Analyzer
+	fixtures fixtureSet
+}
+
+// Analyzer owns the reusable Stage 1 matching and coverage algorithms. It has
+// no fixture dependency and can therefore analyze routing-engine geometry.
+type Analyzer struct {
 	repository Repository
-	fixtures   fixtureSet
+}
+
+func NewAnalyzer(repository Repository) *Analyzer {
+	return &Analyzer{repository: repository}
 }
 
 func NewService(repository Repository, dataRoot string) (*Service, error) {
+	return NewFixtureService(NewAnalyzer(repository), dataRoot)
+}
+
+func NewFixtureService(analyzer *Analyzer, dataRoot string) (*Service, error) {
 	fixtures, err := loadFixtureSet(dataRoot)
 	if err != nil {
 		return nil, err
 	}
-	return &Service{repository: repository, fixtures: fixtures}, nil
+	return &Service{analyzer: analyzer, fixtures: fixtures}, nil
 }
 
 func (service *Service) Routes(ctx context.Context, cityID string) (RouteCollection, error) {
-	version, err := service.repository.CurrentVersion(ctx, cityID)
+	version, err := service.analyzer.CurrentVersion(ctx, cityID)
 	if err != nil {
 		return RouteCollection{}, err
 	}
@@ -48,13 +62,51 @@ func (service *Service) Analyze(ctx context.Context, cityID, routeID string, req
 	if !found {
 		return Analysis{}, ErrRouteNotFound
 	}
-	return service.analyze(ctx, cityID, route, request)
+	version, err := service.analyzer.CurrentVersion(ctx, cityID)
+	if err != nil {
+		return Analysis{}, err
+	}
+	analysis, err := service.analyzer.analyze(ctx, version, route, request)
+	if err == nil {
+		analysis.Warnings = service.versionWarnings(
+			analysis.GeoDataVersion.SourceChecksum, analysis.GeoDataVersion.NormalizationVersion,
+		)
+	}
+	return analysis, err
 }
 
 // AnalyzeGeometry runs the Stage 1 matcher and coverage calculation for a
 // routing-engine result without making engine edge IDs part of the domain.
 func (service *Service) AnalyzeGeometry(
 	ctx context.Context, cityID, routeID string, geometry json.RawMessage, request AnalyzeRequest,
+) (Analysis, error) {
+	analysis, err := service.analyzer.AnalyzeGeometry(ctx, cityID, routeID, geometry, request)
+	if err == nil {
+		analysis.Warnings = service.versionWarnings(
+			analysis.GeoDataVersion.SourceChecksum, analysis.GeoDataVersion.NormalizationVersion,
+		)
+	}
+	return analysis, err
+}
+
+func (analyzer *Analyzer) CurrentVersion(ctx context.Context, cityID string) (querying.Version, error) {
+	return analyzer.repository.CurrentVersion(ctx, cityID)
+}
+
+func (analyzer *Analyzer) AnalyzeGeometry(
+	ctx context.Context, cityID, routeID string, geometry json.RawMessage, request AnalyzeRequest,
+) (Analysis, error) {
+	version, err := analyzer.CurrentVersion(ctx, cityID)
+	if err != nil {
+		return Analysis{}, err
+	}
+	return analyzer.AnalyzeGeometryForVersion(ctx, version, routeID, geometry, request)
+}
+
+// AnalyzeGeometryForVersion pins every spatial query to the supplied geo data
+// version, even if another version becomes READY while analysis is running.
+func (analyzer *Analyzer) AnalyzeGeometryForVersion(
+	ctx context.Context, version querying.Version, routeID string, geometry json.RawMessage, request AnalyzeRequest,
 ) (Analysis, error) {
 	var line lineStringGeometry
 	if err := json.Unmarshal(geometry, &line); err != nil || line.Type != "LineString" || len(line.Coordinates) < 2 {
@@ -68,26 +120,24 @@ func (service *Service) AnalyzeGeometry(
 		}
 		points[index] = domain.Point{Lon: coordinate[0], Lat: coordinate[1]}
 	}
-	return service.analyze(ctx, cityID, Route{ID: routeID, Geometry: geometry, Points: points}, request)
+	return analyzer.analyze(ctx, version, Route{ID: routeID, Geometry: geometry, Points: points}, request)
 }
 
-func (service *Service) analyze(ctx context.Context, cityID string, route Route, request AnalyzeRequest) (Analysis, error) {
+func (analyzer *Analyzer) analyze(ctx context.Context, version querying.Version, route Route, request AnalyzeRequest) (Analysis, error) {
 	if err := validateAnalyzeRequest(request); err != nil {
 		return Analysis{}, err
 	}
-	version, err := service.repository.CurrentVersion(ctx, cityID)
-	if err != nil {
-		return Analysis{}, err
-	}
-	candidates, err := service.repository.CandidateSegments(ctx, cityID, route.Geometry, AnalysisContextRadiusMeters)
+	candidates, err := analyzer.repository.CandidateSegments(
+		ctx, version.CityID, version.ID, route.Geometry, AnalysisContextRadiusMeters,
+	)
 	if err != nil {
 		return Analysis{}, err
 	}
 	matched, unmatched, normalized, direct, matchedMeters := matchRoute(route.Points, candidates, request.Matching)
 	coverageCandidates := []CandidateSegment{}
 	if len(normalized) > 0 {
-		coverageCandidates, err = service.repository.CoverageSegments(
-			ctx, cityID, normalized, request.Coverage.RadiusMeters, AnalysisContextRadiusMeters,
+		coverageCandidates, err = analyzer.repository.CoverageSegments(
+			ctx, version.CityID, version.ID, normalized, request.Coverage.RadiusMeters, AnalysisContextRadiusMeters,
 		)
 		if err != nil {
 			return Analysis{}, err
@@ -101,7 +151,7 @@ func (service *Service) analyze(ctx context.Context, cityID string, route Route,
 	}
 	return Analysis{
 		RouteID: route.ID, GeoDataVersion: versionReference(version),
-		Warnings: service.versionWarnings(version.SourceChecksum, version.NormalizationVersion),
+		Warnings: nil,
 		Matching: request.Matching, CoverageProfile: request.Coverage,
 		ContextRadiusMeters: AnalysisContextRadiusMeters,
 		SourceRoute:         route.Geometry, NormalizedRoute: normalizedRouteGeometryJSON(normalized),

@@ -37,4 +37,5 @@ python3 scripts/routing/measure.py --engine osrm --service osrm \
   --output .routing/setup-parts/osrm.json
 
 python3 scripts/routing/merge_metrics.py "$repository_root/.routing"
+"$repository_root/scripts/routing/finalize-metadata.sh"
 echo "routing engines are ready; setup metrics: .routing/setup-metrics.json"

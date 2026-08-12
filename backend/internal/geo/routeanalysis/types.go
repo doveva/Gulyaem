@@ -90,8 +90,8 @@ type NormalizedRouteFragment struct {
 
 type Repository interface {
 	CurrentVersion(context.Context, string) (querying.Version, error)
-	CandidateSegments(context.Context, string, json.RawMessage, float64) ([]CandidateSegment, error)
-	CoverageSegments(context.Context, string, []NormalizedRouteFragment, float64, float64) ([]CandidateSegment, error)
+	CandidateSegments(context.Context, string, string, json.RawMessage, float64) ([]CandidateSegment, error)
+	CoverageSegments(context.Context, string, string, []NormalizedRouteFragment, float64, float64) ([]CandidateSegment, error)
 }
 
 type Score struct {

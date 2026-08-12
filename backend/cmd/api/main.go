@@ -16,6 +16,8 @@ import (
 	"github.com/doveva/Gulyaem/backend/internal/platform/database"
 	"github.com/doveva/Gulyaem/backend/internal/platform/database/geoquery"
 	routeanalysisdb "github.com/doveva/Gulyaem/backend/internal/platform/database/routeanalysis"
+	"github.com/doveva/Gulyaem/backend/internal/platform/routing/valhalla"
+	"github.com/doveva/Gulyaem/backend/internal/routing/preview"
 	"github.com/doveva/Gulyaem/backend/internal/transport/httpapi"
 )
 
@@ -45,10 +47,15 @@ func run() error {
 	defer db.Close()
 	geoRepository := geoquery.New(db)
 	geoService := querying.NewService(geoRepository)
-	routeAnalysisService, err := routeanalysis.NewService(routeanalysisdb.New(db, geoRepository), cfg.GeoDataPath)
+	routeAnalysisRepository := routeanalysisdb.New(db, geoRepository)
+	routeAnalyzer := routeanalysis.NewAnalyzer(routeAnalysisRepository)
+	routeAnalysisService, err := routeanalysis.NewFixtureService(routeAnalyzer, cfg.GeoDataPath)
 	if err != nil {
 		return err
 	}
+	routingMetadata := valhalla.NewFileMetadataSource(cfg.RoutingDatasetMetadataPath)
+	routingEngine := valhalla.New(cfg.ValhallaURL, cfg.RoutingTimeout, routingMetadata)
+	routePreviewService := preview.NewService(routingEngine, routeAnalyzer, logger)
 
 	handler := httpapi.NewHandler(httpapi.Dependencies{
 		Database:       db,
@@ -57,6 +64,9 @@ func run() error {
 		AllowedOrigins: cfg.CORSAllowedOrigins,
 		Geo:            geoService,
 		RouteAnalysis:  routeAnalysisService,
+		RoutePreview:   routePreviewService,
+		Routing:        routingEngine,
+		RoutingDataset: routePreviewService,
 	})
 	server := &http.Server{
 		Addr:              cfg.HTTPAddress,

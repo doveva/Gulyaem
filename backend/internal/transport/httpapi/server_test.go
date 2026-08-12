@@ -17,6 +17,10 @@ type healthCheckerStub struct {
 
 func (stub healthCheckerStub) Ping(context.Context) error { return stub.err }
 
+type readinessCheckerStub struct{ err error }
+
+func (stub readinessCheckerStub) Ready(context.Context) error { return stub.err }
+
 func TestReadiness(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -40,6 +44,31 @@ func TestReadiness(t *testing.T) {
 				t.Fatalf("status = %d, want %d", response.Code, test.wantStatus)
 			}
 		})
+	}
+}
+
+func TestReadinessIncludesRoutingWhenConfigured(t *testing.T) {
+	handler := NewHandler(Dependencies{
+		Database: healthCheckerStub{}, Routing: healthCheckerStub{err: errors.New("down")},
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Environment: "test",
+	})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/health/ready", nil))
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusServiceUnavailable)
+	}
+}
+
+func TestReadinessIncludesRoutingDatasetCompatibility(t *testing.T) {
+	handler := NewHandler(Dependencies{
+		Database: healthCheckerStub{}, Routing: healthCheckerStub{},
+		RoutingDataset: readinessCheckerStub{err: errors.New("mismatch")},
+		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)), Environment: "test",
+	})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/health/ready", nil))
+	if response.Code != http.StatusServiceUnavailable || !strings.Contains(response.Body.String(), "routing dataset incompatible") {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
 	}
 }
 

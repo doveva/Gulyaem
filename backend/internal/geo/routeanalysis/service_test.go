@@ -1,12 +1,72 @@
 package routeanalysis
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"testing"
 
 	"github.com/doveva/Gulyaem/backend/internal/geo/domain"
+	"github.com/doveva/Gulyaem/backend/internal/geo/querying"
 )
+
+type pinningRepositoryStub struct {
+	currentVersionCalls int
+	candidateVersionID  string
+	coverageVersionID   string
+}
+
+func (stub *pinningRepositoryStub) CurrentVersion(context.Context, string) (querying.Version, error) {
+	stub.currentVersionCalls++
+	return querying.Version{ID: "version-b", CityID: "city", Status: domain.GeoDataVersionReady}, nil
+}
+
+func (stub *pinningRepositoryStub) CandidateSegments(
+	_ context.Context, _, versionID string, _ json.RawMessage, _ float64,
+) ([]CandidateSegment, error) {
+	stub.candidateVersionID = versionID
+	return []CandidateSegment{{
+		ID: "segment-a", Geometry: []domain.Point{{Lon: 30, Lat: 60}, {Lon: 30.001, Lat: 60}},
+		LengthMeters: 56, Classification: domain.StreetSegmentExplore,
+	}}, nil
+}
+
+func (stub *pinningRepositoryStub) CoverageSegments(
+	_ context.Context, _, versionID string, _ []NormalizedRouteFragment, _, _ float64,
+) ([]CandidateSegment, error) {
+	stub.coverageVersionID = versionID
+	return []CandidateSegment{{
+		ID: "segment-a", Geometry: []domain.Point{{Lon: 30, Lat: 60}, {Lon: 30.001, Lat: 60}},
+		LengthMeters: 56, Classification: domain.StreetSegmentExplore, RadiusCoveredMeters: 56,
+	}}, nil
+}
+
+func TestAnalyzeGeometryForVersionPinsEveryRepositoryQuery(t *testing.T) {
+	repository := &pinningRepositoryStub{}
+	analyzer := NewAnalyzer(repository)
+	pinned := querying.Version{
+		ID: "version-a", CityID: "city", SourceChecksum: "checksum-a", Status: domain.GeoDataVersionReady,
+	}
+	analysis, err := analyzer.AnalyzeGeometryForVersion(
+		context.Background(), pinned, "version-switch",
+		json.RawMessage(`{"type":"LineString","coordinates":[[30,60],[30.001,60]]}`),
+		AnalyzeRequest{Matching: DefaultMatchingParameters(), Coverage: CoverageProfiles["balanced"]},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repository.currentVersionCalls != 0 {
+		t.Fatalf("CurrentVersion calls during pinned analysis = %d, want 0", repository.currentVersionCalls)
+	}
+	if repository.candidateVersionID != pinned.ID || repository.coverageVersionID != pinned.ID {
+		t.Fatalf("query versions = candidate %q, coverage %q; want %q",
+			repository.candidateVersionID, repository.coverageVersionID, pinned.ID)
+	}
+	if analysis.GeoDataVersion.ID != pinned.ID {
+		t.Fatalf("analysis version = %q, want %q", analysis.GeoDataVersion.ID, pinned.ID)
+	}
+}
 
 func TestCoverageRadiusSupportedRange(t *testing.T) {
 	request := AnalyzeRequest{Matching: DefaultMatchingParameters(), Coverage: CoverageProfile{

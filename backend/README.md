@@ -3,7 +3,8 @@
 Go modular-monolith backend for the Gulyaem geo exploration service. The current implementation
 provides the HTTP process, PostgreSQL/PostGIS connectivity and a reproducible OSM PBF import that
 builds versioned, classified `StreetSegment` geometry and independently versioned administrative
-districts.
+districts. Stage 2 adds stateless pedestrian route previews through Valhalla and the existing geo
+analysis core.
 
 ## Responsibility
 
@@ -14,6 +15,10 @@ districts.
 - normalize pedestrian semantics and generate topology-based `StreetSegment`;
 - import and publish normalized administrative `District` boundaries;
 - analyze committed sample routes with sequential matching and radius coverage without persistence;
+- generate arbitrary pedestrian routes through an engine-neutral port and the Valhalla adapter;
+- verify routing graph metadata against the current READY `GeoDataVersion` before routing;
+- pin the resolved `GeoDataVersion` ID through every route matching and coverage query;
+- compose stateless potential exploration previews without creating `Route` or `Walk` records;
 - run a reproducible routing-engine comparison without importing engine graph identity into the domain;
 - emit structured application logs.
 
@@ -27,7 +32,13 @@ OSM parser types are isolated in `internal/platform/osm`; raw OSM entities are n
 ## Main scenarios
 
 - `GET /health/live` checks that the API process is alive.
-- `GET /health/ready` checks that PostgreSQL is reachable and PostGIS is enabled.
+- `GET /health/ready` checks PostgreSQL, Valhalla and the graph-bound routing metadata against the
+  current READY `GeoDataVersion`.
+- `POST /api/v1/route-previews` accepts 2–10 ordered pedestrian waypoints, verifies dataset
+  compatibility, routes through Valhalla and returns distance, duration and Balanced potential
+  exploration coverage. Product payloads include COMPLETED/PARTIAL coverage and diagnostic
+  connectors, while NOT_COVERED context remains represented by aggregate metrics. Routing,
+  timeout, no-route and checksum mismatch failures are normalized.
 - `GET /api/v1/cities/{cityId}/geo-version` returns the current `READY` version.
 - `GET /api/v1/geo/segments` returns filtered GeoJSON for a bounded viewport with statistics.
 - `GET /api/v1/geo/segments/{segmentId}` returns current or historical segment details; source OSM
@@ -59,9 +70,12 @@ internal/geo/            geo domain and import application boundary
 internal/geo/segmenting/ WalkabilityProfile and topology-based segmentation
 internal/geo/querying/    bounded read use cases and viewport statistics
 internal/geo/routeanalysis/ stateless sequential matching and coverage semantics
+internal/routing/port/      engine-neutral routing contracts
+internal/routing/preview/   stateless Stage 2 application orchestration
 internal/routingspike/   engine adapters, benchmark metrics and report generation
 internal/config/         environment configuration
 internal/platform/       infrastructure adapters
+internal/platform/routing/valhalla/ Valhalla HTTP adapter
 internal/transport/      HTTP transport
 migrations/              golang-migrate SQL migrations
 ```
@@ -85,6 +99,12 @@ make api
 
 Verify it with `curl http://localhost:8080/health/ready`. Run tests with
 `CGO_ENABLED=0 go test ./...`.
+
+For the full Stage 2 runtime, `make up` verifies the committed routing PBF, invalidates a graph
+built for a different source, starts Valhalla and finalizes graph-bound metadata only after the
+engine is ready. The API verifies the metadata file and the SHA-256 of its mounted graph artifact
+before it can become ready. See
+[`infra/routing/valhalla/README.md`](../infra/routing/valhalla/README.md).
 
 An explicit connection string remains supported and takes precedence:
 
@@ -146,13 +166,16 @@ route and map-matching fixtures against all engines, and updates the frontend re
 | `DISTRICT_NORMALIZATION_VERSION` | `stage1-districts-v1` | district import identity |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, or `error` |
 | `CORS_ALLOWED_ORIGINS` | local Vite/Compose origins | comma-separated browser origins |
+| `VALHALLA_URL` | `http://localhost:8002` | Valhalla HTTP endpoint |
+| `ROUTING_DATASET_METADATA_PATH` | `../.routing/valhalla/routing-dataset.json` | graph-bound metadata file read and verified by the API |
 
 ## Limitations and technical debt
 
 Raw OSM entities remain only in PBF and temporary import memory; district source geometry and
 sample routes remain committed fixtures. The bbox endpoint rejects viewports larger than 25 km²
 and more than 10,000 matching segments instead of truncating them. Stage 1.5 route matching and
-coverage are stateless request-time experiments, not production Walk/progress persistence.
+coverage and Stage 2 previews are stateless request-time calculations, not production
+Walk/progress persistence.
 `Street.street_id` remains nullable and pedestrian areas/indoor corridors are not converted into
 explorable linear geometry. The PBF parser runs with `CGO_ENABLED=0`; performance is measured
 before changing parser or enabling native zlib. Routing-spike resource measurements are local
