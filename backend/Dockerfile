@@ -1,8 +1,15 @@
-FROM golang:1.25-alpine AS build
+# syntax=docker/dockerfile:1
+FROM golang:1.26-alpine AS build
 
+RUN apk add --no-cache git openssh-client
 WORKDIR /src
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=ssh,required=true \
+    GIT_CONFIG_COUNT=1 \
+    GIT_CONFIG_KEY_0=url.ssh://git@github.com/.insteadOf \
+    GIT_CONFIG_VALUE_0=https://github.com/ \
+    GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new" \
+    GOPRIVATE="github.com/Asksel-Ecosystem/*" go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/geo-import ./cmd/geo-import

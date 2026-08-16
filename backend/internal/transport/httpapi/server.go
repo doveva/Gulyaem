@@ -9,12 +9,12 @@ import (
 	"slices"
 	"time"
 
+	"github.com/Asksel-Ecosystem/askcel-go/health"
 	"github.com/doveva/Gulyaem/backend/internal/exploration"
 	"github.com/doveva/Gulyaem/backend/internal/geo/querying"
 	"github.com/doveva/Gulyaem/backend/internal/geo/routeanalysis"
 	"github.com/doveva/Gulyaem/backend/internal/routing/preview"
 	"github.com/doveva/Gulyaem/backend/internal/walks"
-	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
@@ -53,52 +53,67 @@ type Dependencies struct {
 	Exploration    *exploration.Service
 }
 
-func NewHandler(deps Dependencies) http.Handler {
-	router := chi.NewRouter()
-	router.Use(middleware.RequestID)
-	router.Use(middleware.ClientIPFromRemoteAddr)
-	router.Use(middleware.Recoverer)
-	router.Use(requestLogger(deps.Logger))
-	router.Use(middleware.Compress(5, "application/json"))
-	router.Use(cors(deps.AllowedOrigins))
+type Handler struct {
+	http.Handler
+	health *health.Registry
+}
 
-	router.Get("/health/live", func(response http.ResponseWriter, _ *http.Request) {
-		writeJSON(response, http.StatusOK, map[string]string{
-			"status":      "ok",
-			"environment": deps.Environment,
-		})
-	})
-	router.Get("/health/ready", func(response http.ResponseWriter, request *http.Request) {
-		ctx, cancel := context.WithTimeout(request.Context(), 2*time.Second)
-		defer cancel()
-		if err := deps.Database.Ping(ctx); err != nil {
-			deps.Logger.Error("readiness check failed", "error", err)
-			writeJSON(response, http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
-			return
-		}
-		if deps.Routing != nil {
-			if err := deps.Routing.Ping(ctx); err != nil {
-				deps.Logger.Error("routing readiness check failed", "error", err)
-				writeJSON(response, http.StatusServiceUnavailable, map[string]string{"status": "routing unavailable"})
-				return
-			}
-		}
-		if deps.RoutingDataset != nil {
-			if err := deps.RoutingDataset.Ready(ctx); err != nil {
-				deps.Logger.Error("routing dataset readiness check failed", "error", err)
-				writeJSON(response, http.StatusServiceUnavailable, map[string]string{"status": "routing dataset incompatible"})
-				return
-			}
-		}
-		writeJSON(response, http.StatusOK, map[string]string{"status": "ready"})
-	})
-	registerGeoRoutes(router, deps)
-	registerRouteAnalysisRoutes(router, deps)
-	registerRoutePreviewRoutes(router, deps)
-	registerWalkRoutes(router, deps)
-	registerExplorationRoutes(router, deps)
+func NewHandler(deps Dependencies) *Handler {
+	mux := http.NewServeMux()
 
-	return router
+	checks := health.New(
+		health.WithTimeout(2*time.Second),
+		health.WithObserver(func(event health.Event) {
+			if event.Err != nil && deps.Logger != nil {
+				deps.Logger.Error("health check failed",
+					"class", event.Class,
+					"check", event.Name,
+					"timed_out", event.TimedOut,
+					"duration_ms", event.Duration.Milliseconds(),
+					"error", event.Err,
+				)
+			}
+		}),
+	)
+	mustRegisterHealthCheck(checks.Liveness("startup", func(context.Context) error { return nil }))
+	if deps.Database != nil {
+		mustRegisterHealthCheck(checks.Readiness("database", deps.Database.Ping))
+	}
+	if deps.Routing != nil {
+		mustRegisterHealthCheck(checks.Readiness("routing", deps.Routing.Ping))
+	}
+	if deps.RoutingDataset != nil {
+		mustRegisterHealthCheck(checks.Readiness("routing-dataset", deps.RoutingDataset.Ready))
+	}
+
+	mux.Handle("GET /health/live", checks.LiveHandler())
+	mux.Handle("GET /health/ready", checks.ReadyHandler())
+	registerGeoRoutes(mux, deps)
+	registerRouteAnalysisRoutes(mux, deps)
+	registerRoutePreviewRoutes(mux, deps)
+	registerWalkRoutes(mux, deps)
+	registerExplorationRoutes(mux, deps)
+
+	var handler http.Handler = mux
+	handler = cors(deps.AllowedOrigins)(handler)
+	handler = middleware.Compress(5, "application/json")(handler)
+	handler = requestLogger(deps.Logger)(handler)
+	handler = middleware.Recoverer(handler)
+	handler = middleware.ClientIPFromRemoteAddr(handler)
+	handler = middleware.RequestID(handler)
+	return &Handler{Handler: handler, health: checks}
+}
+
+// Drain removes the API from readiness while allowing in-flight requests to
+// finish and leaving liveness untouched.
+func (h *Handler) Drain() {
+	h.health.Drain()
+}
+
+func mustRegisterHealthCheck(err error) {
+	if err != nil {
+		panic(err)
+	}
 }
 
 func writeJSON(response http.ResponseWriter, status int, body any) {
@@ -142,9 +157,9 @@ func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 			started := time.Now()
 			recorder := &responseRecorder{ResponseWriter: response, status: http.StatusOK}
 			next.ServeHTTP(recorder, request)
-			logger.Info("http request",
+			logger.InfoContext(request.Context(), "http request",
 				"method", request.Method,
-				"path", request.URL.Path,
+				"route", request.Pattern,
 				"status", recorder.status,
 				"duration_ms", time.Since(started).Milliseconds(),
 				"request_id", middleware.GetReqID(request.Context()),

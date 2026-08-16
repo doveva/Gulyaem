@@ -109,6 +109,22 @@ func TestPingUsesValhallaStatus(t *testing.T) {
 	}
 }
 
+func TestNewWithHTTPClientUsesCallerTransport(t *testing.T) {
+	called := false
+	httpClient := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		called = true
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`)), Header: make(http.Header)}, nil
+	})}
+	client := NewWithHTTPClient("http://valhalla.test", httpClient, staticMetadataSource{metadata: validMetadata()})
+
+	if err := client.Ping(context.Background()); err != nil {
+		t.Fatalf("Ping() error = %v", err)
+	}
+	if !called {
+		t.Fatal("caller transport was not used")
+	}
+}
+
 func validMetadata() port.Metadata {
 	return port.Metadata{
 		Engine: "valhalla", EngineVersion: "3.7.0", CityID: "01900000-0000-7000-8000-000000000001",

@@ -28,9 +28,19 @@ type MetadataSource interface {
 }
 
 func New(baseURL string, timeout time.Duration, metadataSource MetadataSource) *Client {
+	return NewWithHTTPClient(baseURL, &http.Client{Timeout: timeout}, metadataSource)
+}
+
+// NewWithHTTPClient constructs a Valhalla client with the caller-owned HTTP
+// policy. The application composition root uses it to install Askcel telemetry
+// without coupling the Stage 2 routing adapter to observability.
+func NewWithHTTPClient(baseURL string, httpClient *http.Client, metadataSource MetadataSource) *Client {
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
 	return &Client{
 		baseURL:        strings.TrimRight(baseURL, "/"),
-		httpClient:     &http.Client{Timeout: timeout},
+		httpClient:     httpClient,
 		metadataSource: metadataSource,
 	}
 }

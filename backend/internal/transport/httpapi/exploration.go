@@ -8,15 +8,14 @@ import (
 
 	"github.com/doveva/Gulyaem/backend/internal/exploration"
 	"github.com/doveva/Gulyaem/backend/internal/geo/querying"
-	"github.com/go-chi/chi/v5"
 )
 
-func registerExplorationRoutes(router chi.Router, deps Dependencies) {
+func registerExplorationRoutes(router *http.ServeMux, deps Dependencies) {
 	if deps.Exploration == nil || deps.Actor == nil {
 		return
 	}
-	router.Get("/api/v1/cities/{cityId}/exploration", cityExplorationHandler(deps))
-	router.Get("/api/v1/cities/{cityId}/exploration/segments", exploredSegmentsHandler(deps))
+	router.Handle("GET /api/v1/cities/{cityId}/exploration", cityExplorationHandler(deps))
+	router.Handle("GET /api/v1/cities/{cityId}/exploration/segments", exploredSegmentsHandler(deps))
 }
 func cityExplorationHandler(deps Dependencies) http.HandlerFunc {
 	return func(response http.ResponseWriter, request *http.Request) {
@@ -24,7 +23,7 @@ func cityExplorationHandler(deps Dependencies) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		result, err := deps.Exploration.City(request.Context(), actor, chi.URLParam(request, "cityId"))
+		result, err := deps.Exploration.City(request.Context(), actor, request.PathValue("cityId"))
 		if err != nil {
 			handleExplorationError(response, deps, err)
 			return
@@ -43,7 +42,7 @@ func exploredSegmentsHandler(deps Dependencies) http.HandlerFunc {
 			writeRoutePreviewError(response, http.StatusBadRequest, "invalid_query", "bbox must contain west,south,east,north")
 			return
 		}
-		result, err := deps.Exploration.Segments(request.Context(), actor, chi.URLParam(request, "cityId"), bbox)
+		result, err := deps.Exploration.Segments(request.Context(), actor, request.PathValue("cityId"), bbox)
 		if err != nil {
 			handleExplorationError(response, deps, err)
 			return

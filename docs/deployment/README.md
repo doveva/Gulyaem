@@ -5,9 +5,10 @@
 
 ## Требования
 
-- Go 1.25+;
+- Go 1.26+;
 - Node.js 24+ и npm;
-- Docker с Compose.
+- Docker с Compose и BuildKit SSH forwarding;
+- SSH agent с GitHub key, имеющим read access к приватному `askcel-go`.
 
 ## Полный стек в Docker Compose
 
@@ -140,7 +141,7 @@ docker compose run --rm migrate
 ## Health checks и диагностика
 
 - `/health/live` проверяет процесс API;
-- `/health/ready` проверяет соединение с PostgreSQL и доступность PostGIS;
+- `/health/ready` через `askcel-go/health` проверяет PostgreSQL, Valhalla и совместимость routing metadata;
 - `/health` внутри frontend-контейнера проверяет nginx.
 
 Структурированные JSON-логи API доступны через:

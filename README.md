@@ -48,6 +48,15 @@ Completion сравнивает trusted coverage snapshot с actor-scoped progre
 `REVISITED`. Только `COMPLETED EXPLORE` влияет на карту; `PARTIAL`, `ROUTABLE_ONLY` и `IGNORE`
 персональный progress не создают.
 
+## Runtime API
+
+API использует `askcel-go` для Runtime Contract v1, OpenTelemetry и health checks. `make api` и
+Compose материализуют локальные `ASKCEL_*` значения; управляемое окружение обязано передать их
+само. Без `OTEL_EXPORTER_OTLP_ENDPOINT` instrumentation остаётся включённым, но экспорт не
+создаётся. Во время graceful shutdown readiness переходит в `draining`, а liveness остаётся
+доступным до остановки процесса. Для container build приватной зависимости `askcel-go` Compose
+пробрасывает BuildKit SSH agent; в agent должен быть загружен GitHub deploy/user key с read access.
+
 ## Основные документы
 
 - `AGENTS.md` — scope guard для coding agent.

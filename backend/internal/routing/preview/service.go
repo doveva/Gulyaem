@@ -127,7 +127,7 @@ func (service *Service) Create(ctx context.Context, request Request) (Result, er
 		return Result{}, fmt.Errorf("analyze route preview: %w", err)
 	}
 	if analysis.GeoDataVersion.ID != version.ID || analysis.GeoDataVersion.SourceChecksum != metadata.SourceChecksum {
-		service.logger.Error("route preview geo version changed during analysis", "city_id", request.CityID)
+		service.logger.ErrorContext(ctx, "route preview geo version changed during analysis", "city_id", request.CityID)
 		return Result{}, ErrDatasetMismatch
 	}
 	metrics := metricsFromAnalysis(analysis)
@@ -136,7 +136,7 @@ func (service *Service) Create(ctx context.Context, request Request) (Result, er
 	if metrics.RouteMatchedRatio < lowRouteMatchWarningThreshold {
 		warnings = append(warnings, "low_route_match")
 	}
-	service.logger.Info("route preview calculated",
+	service.logger.InfoContext(ctx, "route preview calculated",
 		"engine", metadata.Engine, "city_id", request.CityID, "waypoint_count", len(request.Waypoints),
 		"routing_duration_ms", routingDuration.Milliseconds(),
 		"analysis_duration_ms", analysisDuration.Milliseconds(),
@@ -191,7 +191,7 @@ func (service *Service) compatibleDatasetWithMetadata(
 	ctx context.Context, cityID string, metadata port.Metadata,
 ) (port.Metadata, querying.Version, error) {
 	if metadata.CityID != cityID {
-		service.logger.Error("route preview routing city mismatch", "routing_city_id", metadata.CityID, "city_id", cityID)
+		service.logger.ErrorContext(ctx, "route preview routing city mismatch", "routing_city_id", metadata.CityID, "city_id", cityID)
 		return port.Metadata{}, querying.Version{}, ErrDatasetMismatch
 	}
 	version, err := service.analyzer.CurrentVersion(ctx, cityID)
@@ -202,7 +202,7 @@ func (service *Service) compatibleDatasetWithMetadata(
 		return port.Metadata{}, querying.Version{}, fmt.Errorf("resolve current geo data version: %w", err)
 	}
 	if metadata.SourceChecksum != version.SourceChecksum {
-		service.logger.Error("route preview dataset mismatch",
+		service.logger.ErrorContext(ctx, "route preview dataset mismatch",
 			"engine", metadata.Engine, "routing_checksum", metadata.SourceChecksum,
 			"geo_checksum", version.SourceChecksum, "city_id", cityID,
 		)

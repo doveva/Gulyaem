@@ -10,14 +10,13 @@ import (
 	"github.com/doveva/Gulyaem/backend/internal/geo/routeanalysis"
 	"github.com/doveva/Gulyaem/backend/internal/routing/port"
 	"github.com/doveva/Gulyaem/backend/internal/routing/preview"
-	"github.com/go-chi/chi/v5"
 )
 
-func registerRoutePreviewRoutes(router chi.Router, deps Dependencies) {
+func registerRoutePreviewRoutes(router *http.ServeMux, deps Dependencies) {
 	if deps.RoutePreview == nil {
 		return
 	}
-	router.Post("/api/v1/route-previews", createRoutePreviewHandler(deps))
+	router.Handle("POST /api/v1/route-previews", createRoutePreviewHandler(deps))
 }
 
 func createRoutePreviewHandler(deps Dependencies) http.HandlerFunc {

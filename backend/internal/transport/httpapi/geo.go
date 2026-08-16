@@ -13,7 +13,6 @@ import (
 
 	"github.com/doveva/Gulyaem/backend/internal/geo/domain"
 	"github.com/doveva/Gulyaem/backend/internal/geo/querying"
-	"github.com/go-chi/chi/v5"
 )
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$`)
@@ -135,14 +134,14 @@ type segmentDebugSource struct {
 	EndNodeID   *int64            `json:"endNodeId,omitempty"`
 }
 
-func registerGeoRoutes(router chi.Router, deps Dependencies) {
+func registerGeoRoutes(router *http.ServeMux, deps Dependencies) {
 	if deps.Geo == nil {
 		return
 	}
-	router.Get("/api/v1/cities/{cityId}/geo-version", currentGeoVersionHandler(deps))
-	router.Get("/api/v1/geo/segments", segmentsHandler(deps))
-	router.Get("/api/v1/geo/segments/{segmentId}", segmentDetailHandler(deps))
-	router.Get("/api/v1/geo/districts", districtsHandler(deps))
+	router.Handle("GET /api/v1/cities/{cityId}/geo-version", currentGeoVersionHandler(deps))
+	router.Handle("GET /api/v1/geo/segments", segmentsHandler(deps))
+	router.Handle("GET /api/v1/geo/segments/{segmentId}", segmentDetailHandler(deps))
+	router.Handle("GET /api/v1/geo/districts", districtsHandler(deps))
 }
 
 func districtsHandler(deps Dependencies) http.HandlerFunc {
@@ -188,7 +187,7 @@ func districtsHandler(deps Dependencies) http.HandlerFunc {
 
 func currentGeoVersionHandler(deps Dependencies) http.HandlerFunc {
 	return func(response http.ResponseWriter, request *http.Request) {
-		cityID := chi.URLParam(request, "cityId")
+		cityID := request.PathValue("cityId")
 		if !uuidPattern.MatchString(cityID) {
 			writeAPIError(response, http.StatusBadRequest, "invalid_city_id", "cityId must be a UUID")
 			return
@@ -246,7 +245,7 @@ func segmentsHandler(deps Dependencies) http.HandlerFunc {
 
 func segmentDetailHandler(deps Dependencies) http.HandlerFunc {
 	return func(response http.ResponseWriter, request *http.Request) {
-		segmentID := chi.URLParam(request, "segmentId")
+		segmentID := request.PathValue("segmentId")
 		if !uuidPattern.MatchString(segmentID) {
 			writeAPIError(response, http.StatusBadRequest, "invalid_segment_id", "segmentId must be a UUID")
 			return

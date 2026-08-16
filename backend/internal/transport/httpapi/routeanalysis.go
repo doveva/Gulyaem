@@ -10,7 +10,6 @@ import (
 
 	"github.com/doveva/Gulyaem/backend/internal/geo/querying"
 	"github.com/doveva/Gulyaem/backend/internal/geo/routeanalysis"
-	"github.com/go-chi/chi/v5"
 )
 
 type analyzeRouteRequest struct {
@@ -24,12 +23,12 @@ type analyzeRouteRequest struct {
 	} `json:"coverage"`
 }
 
-func registerRouteAnalysisRoutes(router chi.Router, deps Dependencies) {
+func registerRouteAnalysisRoutes(router *http.ServeMux, deps Dependencies) {
 	if deps.RouteAnalysis == nil {
 		return
 	}
-	router.Get("/api/v1/geo/sample-routes", sampleRoutesHandler(deps))
-	router.Post("/api/v1/geo/sample-routes/{routeId}/analyze", analyzeSampleRouteHandler(deps))
+	router.Handle("GET /api/v1/geo/sample-routes", sampleRoutesHandler(deps))
+	router.Handle("POST /api/v1/geo/sample-routes/{routeId}/analyze", analyzeSampleRouteHandler(deps))
 }
 
 func sampleRoutesHandler(deps Dependencies) http.HandlerFunc {
@@ -55,7 +54,7 @@ func analyzeSampleRouteHandler(deps Dependencies) http.HandlerFunc {
 			writeAPIError(response, http.StatusBadRequest, "invalid_query", "cityId must be a UUID")
 			return
 		}
-		routeID := chi.URLParam(request, "routeId")
+		routeID := request.PathValue("routeId")
 		if !routeIDPattern.MatchString(routeID) {
 			writeAPIError(response, http.StatusBadRequest, "invalid_route_id", "routeId is invalid")
 			return

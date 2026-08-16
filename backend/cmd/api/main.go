@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -10,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Asksel-Ecosystem/askcel-go/observability"
+	"github.com/Asksel-Ecosystem/askcel-go/runtime"
 	"github.com/doveva/Gulyaem/backend/internal/config"
 	"github.com/doveva/Gulyaem/backend/internal/exploration"
 	"github.com/doveva/Gulyaem/backend/internal/geo/querying"
@@ -38,7 +41,29 @@ func run() error {
 		return err
 	}
 
-	logger := newLogger(cfg.LogLevel)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	meta, err := runtime.Load()
+	if err != nil {
+		return err
+	}
+
+	telemetry, err := observability.Setup(ctx, observability.Config{Metadata: meta})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		// Shutdown is bounded by the caller, not by the exporter: a collector
+		// that stopped answering must not hold the process open.
+		flush, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := telemetry.Shutdown(flush); err != nil {
+			log.Printf("telemetry shutdown: %v", err)
+		}
+	}()
+
+	logger := newLogger(cfg.LogLevel, meta)
 	slog.SetDefault(logger)
 
 	startupCtx, cancelStartup := context.WithTimeout(context.Background(), 10*time.Second)
@@ -58,7 +83,8 @@ func run() error {
 		return err
 	}
 	routingMetadata := valhalla.NewFileMetadataSource(cfg.RoutingDatasetMetadataPath)
-	routingEngine := valhalla.New(cfg.ValhallaURL, cfg.RoutingTimeout, routingMetadata)
+	routingHTTPClient := telemetry.HTTPClient(&http.Client{Timeout: cfg.RoutingTimeout})
+	routingEngine := valhalla.NewWithHTTPClient(cfg.ValhallaURL, routingHTTPClient, routingMetadata)
 	routePreviewService := preview.NewService(routingEngine, routeAnalyzer, logger)
 	walkRepository := walksdb.New(db)
 	walkService := walks.NewService(routePreviewService, walkRepository)
@@ -68,7 +94,7 @@ func run() error {
 	handler := httpapi.NewHandler(httpapi.Dependencies{
 		Database:       db,
 		Logger:         logger,
-		Environment:    cfg.Environment,
+		Environment:    meta.Environment,
 		AllowedOrigins: cfg.CORSAllowedOrigins,
 		Geo:            geoService,
 		RouteAnalysis:  routeAnalysisService,
@@ -81,7 +107,7 @@ func run() error {
 	})
 	server := &http.Server{
 		Addr:              cfg.HTTPAddress,
-		Handler:           handler,
+		Handler:           telemetry.HTTPHandler(handler),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -90,15 +116,17 @@ func run() error {
 
 	serverErrors := make(chan error, 1)
 	go func() {
-		logger.Info("api listening", "address", cfg.HTTPAddress, "environment", cfg.Environment)
+		logger.Info("api listening",
+			"address", cfg.HTTPAddress,
+			"runtime", meta.String(),
+			"telemetry_exporting", telemetry.Exporting(),
+		)
 		serverErrors <- server.ListenAndServe()
 	}()
 
-	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
 	select {
-	case <-signalCtx.Done():
+	case <-ctx.Done():
+		handler.Drain()
 		shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 		defer cancelShutdown()
 		if err := server.Shutdown(shutdownCtx); err != nil {
@@ -114,7 +142,7 @@ func run() error {
 	}
 }
 
-func newLogger(levelName string) *slog.Logger {
+func newLogger(levelName string, meta runtime.Metadata) *slog.Logger {
 	level := slog.LevelInfo
 	switch levelName {
 	case "debug":
@@ -125,5 +153,8 @@ func newLogger(levelName string) *slog.Logger {
 		level = slog.LevelError
 	}
 
-	return slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
+	return observability.NewLogger(
+		slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}),
+		observability.WithMetadata(meta),
+	)
 }

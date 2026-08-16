@@ -24,13 +24,15 @@ completion, actor-scoped reads and rebuildability.
 - publish binary personal exploration progress in one idempotent transaction;
 - rebuild current progress from final geometry of completed Walks;
 - run a reproducible routing-engine comparison without importing engine graph identity into the domain;
-- emit structured application logs.
+- emit correlated structured logs, HTTP traces and metrics through `askcel-go`;
+- expose bounded Askcel liveness/readiness checks and consume Runtime Contract v1 metadata.
 
 ## Boundaries and dependencies
 
 Transport code lives under `internal/transport`, infrastructure adapters under
 `internal/platform`, and later application/domain packages must not depend on HTTP. The API uses
-`chi` and `pgx`; database schema changes are plain SQL migrations executed by `golang-migrate`.
+the standard `net/http` ServeMux with `chi` middleware and `pgx`; database schema changes are plain
+SQL migrations executed by `golang-migrate`.
 OSM parser types are isolated in `internal/platform/osm`; raw OSM entities are not persisted.
 
 ## Main scenarios
@@ -109,6 +111,9 @@ directory:
 make api
 ```
 
+`askcel-go` is a private module. Host builds use the developer's configured Git credentials;
+Docker/Compose builds forward the BuildKit SSH agent, which must hold a GitHub key with read access.
+
 Verify it with `curl http://localhost:8080/health/ready`. Run tests with
 `CGO_ENABLED=0 go test ./...`.
 
@@ -167,7 +172,16 @@ route and map-matching fixtures against all engines, and updates the frontend re
 |---|---|---|
 | `DATABASE_URL` | required | PostgreSQL connection string |
 | `HTTP_ADDRESS` | `:8080` | API listen address |
-| `ENVIRONMENT` | `development` | runtime environment name |
+| `ASKCEL_RUNTIME_CONTRACT_VERSION` | `1` via Make/Compose | Askcel Runtime Contract major version |
+| `ASKCEL_PRODUCT` | `walking` via Make/Compose | platform product identity |
+| `ASKCEL_WORKLOAD` | `walking-api` via Make/Compose | platform workload identity |
+| `ASKCEL_ENVIRONMENT` | `development` via Make/Compose | deployment environment identity |
+| `ASKCEL_RELEASE` | `local` via Make/Compose | deployment release identity |
+| `ASKCEL_VERSION` | `dev` via Make/Compose | artifact version identity |
+| `ASKCEL_INSTANCE` | empty | optional runtime instance identity |
+| `ASKCEL_BUILD_COMMIT` | empty | optional artifact commit provenance |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | empty | optional OTLP collector endpoint; telemetry is dropped when unset |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf` | OTLP transport (`http/protobuf` or `grpc`) |
 | `GEO_DATA_PATH` | `./data` | future geo-import input root |
 | `GEO_TEST_AREA` | `spb-stage1-validation` | combined Stage 1.5 fixture selector; dense-center remains available for regression |
 | `GEO_IMPORT_FILE` | empty | explicit local PBF for `make geo-import` |

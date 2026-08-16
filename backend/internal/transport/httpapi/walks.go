@@ -11,21 +11,20 @@ import (
 	"github.com/doveva/Gulyaem/backend/internal/routing/port"
 	"github.com/doveva/Gulyaem/backend/internal/routing/preview"
 	"github.com/doveva/Gulyaem/backend/internal/walks"
-	"github.com/go-chi/chi/v5"
 )
 
-func registerWalkRoutes(router chi.Router, deps Dependencies) {
+func registerWalkRoutes(router *http.ServeMux, deps Dependencies) {
 	if deps.Walks == nil || deps.Actor == nil {
 		return
 	}
-	router.Post("/api/v1/walks", createWalkHandler(deps))
-	router.Get("/api/v1/walks/{walkId}", getWalkHandler(deps))
-	router.Post("/api/v1/walks/{walkId}/start", walkActionHandler(deps, "start"))
-	router.Post("/api/v1/walks/{walkId}/finish", walkActionHandler(deps, "finish"))
-	router.Post("/api/v1/walks/{walkId}/cancel", walkActionHandler(deps, "cancel"))
-	router.Put("/api/v1/walks/{walkId}/route", correctWalkRouteHandler(deps))
+	router.Handle("POST /api/v1/walks", createWalkHandler(deps))
+	router.Handle("GET /api/v1/walks/{walkId}", getWalkHandler(deps))
+	router.Handle("POST /api/v1/walks/{walkId}/start", walkActionHandler(deps, "start"))
+	router.Handle("POST /api/v1/walks/{walkId}/finish", walkActionHandler(deps, "finish"))
+	router.Handle("POST /api/v1/walks/{walkId}/cancel", walkActionHandler(deps, "cancel"))
+	router.Handle("PUT /api/v1/walks/{walkId}/route", correctWalkRouteHandler(deps))
 	if deps.Exploration != nil {
-		router.Post("/api/v1/walks/{walkId}/complete", completeWalkHandler(deps))
+		router.Handle("POST /api/v1/walks/{walkId}/complete", completeWalkHandler(deps))
 	}
 }
 
@@ -57,7 +56,7 @@ func getWalkHandler(deps Dependencies) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		result, err := deps.Walks.Get(request.Context(), actor, chi.URLParam(request, "walkId"))
+		result, err := deps.Walks.Get(request.Context(), actor, request.PathValue("walkId"))
 		if err != nil {
 			handleWalkError(response, deps, err)
 			return
@@ -75,11 +74,11 @@ func walkActionHandler(deps Dependencies, action string) http.HandlerFunc {
 		var err error
 		switch action {
 		case "start":
-			result, err = deps.Walks.Start(request.Context(), actor, chi.URLParam(request, "walkId"))
+			result, err = deps.Walks.Start(request.Context(), actor, request.PathValue("walkId"))
 		case "finish":
-			result, err = deps.Walks.Finish(request.Context(), actor, chi.URLParam(request, "walkId"))
+			result, err = deps.Walks.Finish(request.Context(), actor, request.PathValue("walkId"))
 		default:
-			result, err = deps.Walks.Cancel(request.Context(), actor, chi.URLParam(request, "walkId"))
+			result, err = deps.Walks.Cancel(request.Context(), actor, request.PathValue("walkId"))
 		}
 		if err != nil {
 			handleWalkError(response, deps, err)
@@ -98,7 +97,7 @@ func correctWalkRouteHandler(deps Dependencies) http.HandlerFunc {
 		if !decodeStrict(response, request, &body) {
 			return
 		}
-		result, err := deps.Walks.CorrectRoute(request.Context(), actor, chi.URLParam(request, "walkId"), body)
+		result, err := deps.Walks.CorrectRoute(request.Context(), actor, request.PathValue("walkId"), body)
 		if err != nil {
 			handleWalkError(response, deps, err)
 			return
@@ -112,7 +111,7 @@ func completeWalkHandler(deps Dependencies) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		result, err := deps.Exploration.Complete(request.Context(), actor, chi.URLParam(request, "walkId"))
+		result, err := deps.Exploration.Complete(request.Context(), actor, request.PathValue("walkId"))
 		if err != nil {
 			handleWalkError(response, deps, err)
 			return

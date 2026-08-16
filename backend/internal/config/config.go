@@ -13,7 +13,6 @@ var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-
 type Config struct {
 	DatabaseURL                string
 	HTTPAddress                string
-	Environment                string
 	GeoDataPath                string
 	GeoTestArea                string
 	DistrictTestArea           string
@@ -39,7 +38,6 @@ func Load() (Config, error) {
 	return Config{
 		DatabaseURL:        databaseURL,
 		HTTPAddress:        envOrDefault("HTTP_ADDRESS", ":8080"),
-		Environment:        envOrDefault("ENVIRONMENT", "development"),
 		GeoDataPath:        envOrDefault("GEO_DATA_PATH", "./data"),
 		GeoTestArea:        strings.TrimSpace(os.Getenv("GEO_TEST_AREA")),
 		DistrictTestArea:   strings.TrimSpace(os.Getenv("DISTRICT_TEST_AREA")),

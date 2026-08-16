@@ -67,7 +67,7 @@ func TestReadinessIncludesRoutingDatasetCompatibility(t *testing.T) {
 	})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/health/ready", nil))
-	if response.Code != http.StatusServiceUnavailable || !strings.Contains(response.Body.String(), "routing dataset incompatible") {
+	if response.Code != http.StatusServiceUnavailable || !strings.Contains(response.Body.String(), `"status":"not ready"`) {
 		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
 	}
 }
@@ -85,5 +85,25 @@ func TestCORSAllowsConfiguredOrigin(t *testing.T) {
 	handler.ServeHTTP(response, request)
 	if got := response.Header().Get("Access-Control-Allow-Origin"); !strings.EqualFold(got, "http://localhost:5173") {
 		t.Fatalf("Access-Control-Allow-Origin = %q", got)
+	}
+}
+
+func TestDrainMakesReadinessFailWithoutAffectingLiveness(t *testing.T) {
+	handler := NewHandler(Dependencies{
+		Database: healthCheckerStub{},
+		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
+	handler.Drain()
+
+	ready := httptest.NewRecorder()
+	handler.ServeHTTP(ready, httptest.NewRequest(http.MethodGet, "/health/ready", nil))
+	if ready.Code != http.StatusServiceUnavailable || !strings.Contains(ready.Body.String(), `"status":"draining"`) {
+		t.Fatalf("readiness status = %d, body = %s", ready.Code, ready.Body.String())
+	}
+
+	live := httptest.NewRecorder()
+	handler.ServeHTTP(live, httptest.NewRequest(http.MethodGet, "/health/live", nil))
+	if live.Code != http.StatusOK || !strings.Contains(live.Body.String(), `"status":"alive"`) {
+		t.Fatalf("liveness status = %d, body = %s", live.Code, live.Body.String())
 	}
 }

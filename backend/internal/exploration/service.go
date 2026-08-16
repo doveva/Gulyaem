@@ -74,7 +74,7 @@ func (s *Service) Complete(ctx context.Context, actorID, walkID string) (walks.C
 	started := time.Now()
 	result, err := s.repository.Complete(ctx, actorID, walkID)
 	if err == nil {
-		s.logger.Info("walk exploration completed", "walk_id", walkID, "new_segments", result.Exploration.NewSegmentsCount, "revisited_segments", result.Exploration.RevisitedSegmentsCount, "duration_ms", time.Since(started).Milliseconds())
+		s.logger.InfoContext(ctx, "walk exploration completed", "walk_id", walkID, "new_segments", result.Exploration.NewSegmentsCount, "revisited_segments", result.Exploration.RevisitedSegmentsCount, "duration_ms", time.Since(started).Milliseconds())
 	}
 	return result, err
 }
@@ -85,7 +85,7 @@ func (s *Service) City(ctx context.Context, actorID, cityID string) (CityResult,
 	started := time.Now()
 	result, err := s.repository.City(ctx, actorID, cityID)
 	if err == nil {
-		s.logger.Info("city exploration read", "city_id", cityID, "duration_ms", time.Since(started).Milliseconds())
+		s.logger.InfoContext(ctx, "city exploration read", "city_id", cityID, "duration_ms", time.Since(started).Milliseconds())
 	}
 	return result, err
 }
@@ -99,7 +99,7 @@ func (s *Service) Segments(ctx context.Context, actorID, cityID string, bbox [4]
 	started := time.Now()
 	result, err := s.repository.Segments(ctx, actorID, cityID, bbox, querying.MaximumFeatures)
 	if err == nil {
-		s.logger.Info("explored segments read", "city_id", cityID, "duration_ms", time.Since(started).Milliseconds())
+		s.logger.InfoContext(ctx, "explored segments read", "city_id", cityID, "duration_ms", time.Since(started).Milliseconds())
 	}
 	return result, err
 }

@@ -36,11 +36,23 @@ services:
   api:
     build:
       context: ./backend
+      ssh:
+        - default
     image: gulyaem/backend:stage2
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-gulyaem}:${POSTGRES_PASSWORD:-gulyaem}@db:5432/${POSTGRES_DB:-gulyaem}?sslmode=disable
       HTTP_ADDRESS: :8080
       ENVIRONMENT: ${ENVIRONMENT:-development}
+      ASKCEL_RUNTIME_CONTRACT_VERSION: ${ASKCEL_RUNTIME_CONTRACT_VERSION:-1}
+      ASKCEL_PRODUCT: ${ASKCEL_PRODUCT:-walking}
+      ASKCEL_WORKLOAD: ${ASKCEL_WORKLOAD:-walking-api}
+      ASKCEL_ENVIRONMENT: ${ASKCEL_ENVIRONMENT:-development}
+      ASKCEL_RELEASE: ${ASKCEL_RELEASE:-local}
+      ASKCEL_VERSION: ${ASKCEL_VERSION:-dev}
+      ASKCEL_INSTANCE: ${ASKCEL_INSTANCE:-}
+      ASKCEL_BUILD_COMMIT: ${ASKCEL_BUILD_COMMIT:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
       GEO_DATA_PATH: /data
       GEO_TEST_AREA: ${GEO_TEST_AREA:-}
       DISTRICT_TEST_AREA: ${DISTRICT_TEST_AREA:-spb-administrative-districts}
@@ -74,6 +86,8 @@ services:
   geo-import:
     build:
       context: ./backend
+      ssh:
+        - default
     image: gulyaem/backend:stage1
     entrypoint: ["geo-import"]
     command:
@@ -104,6 +118,8 @@ services:
   district-import:
     build:
       context: ./backend
+      ssh:
+        - default
     image: gulyaem/backend:stage1
     entrypoint: ["district-import"]
     command:
