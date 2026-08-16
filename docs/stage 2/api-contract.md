@@ -76,8 +76,8 @@ Conceptual response:
   "explorationPreview": {
     "coverageProfile": {
       "name": "balanced",
-      "radiusMeters": 50,
-      "coverageRatio": 0.6,
+      "radiusMeters": 100,
+      "coverageRatio": 0.4,
       "minRequiredMeters": 15,
       "maxRequiredMeters": 80
     },

@@ -68,10 +68,20 @@ type ExplorationPreview struct {
 }
 
 type Result struct {
+	PreviewFingerprint string                         `json:"previewFingerprint"`
 	GeoDataVersion     routeanalysis.VersionReference `json:"geoDataVersion"`
 	Routing            Routing                        `json:"routing"`
 	ExplorationPreview ExplorationPreview             `json:"explorationPreview"`
 	Warnings           []string                       `json:"warnings"`
+	Materialization    MaterializationProvenance      `json:"-"`
+}
+
+// MaterializationProvenance is server-only data required to persist and later
+// rebuild a trusted Route. It deliberately is not part of the public API.
+type MaterializationProvenance struct {
+	RoutingMetadata port.Metadata
+	AnalysisVersion string
+	Matching        routeanalysis.MatchingParameters
 }
 
 type Service struct {
@@ -133,7 +143,7 @@ func (service *Service) Create(ctx context.Context, request Request) (Result, er
 		"total_duration_ms", time.Since(started).Milliseconds(),
 		"route_matched_ratio", metrics.RouteMatchedRatio,
 	)
-	return Result{
+	result := Result{
 		GeoDataVersion: analysis.GeoDataVersion,
 		Routing: Routing{
 			Engine: metadata.Engine, Profile: request.Profile, DistanceMeters: route.DistanceMeters,
@@ -145,7 +155,17 @@ func (service *Service) Create(ctx context.Context, request Request) (Result, er
 			CoverageSegments: potentialCoverageSegments(analysis.CoverageSegments), Metrics: metrics,
 		},
 		Warnings: warnings,
-	}, nil
+		Materialization: MaterializationProvenance{
+			RoutingMetadata: metadata, AnalysisVersion: routeanalysis.AnalysisVersion,
+			Matching: analysis.Matching,
+		},
+	}
+	fingerprint, err := fingerprint(request, result)
+	if err != nil {
+		return Result{}, fmt.Errorf("fingerprint route preview: %w", err)
+	}
+	result.PreviewFingerprint = fingerprint
+	return result, nil
 }
 
 func (service *Service) Ready(ctx context.Context) error {

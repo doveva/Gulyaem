@@ -26,6 +26,8 @@ OSRM_PORT ?= 5001
 VALHALLA_URL ?= http://localhost:$(VALHALLA_PORT)
 ROUTING_ENGINE_VERSION ?= 3.7.0
 ROUTING_DATASET_METADATA_PATH ?= $(CURDIR)/.routing/valhalla/routing-dataset.json
+DEVELOPMENT_ACTOR_ID ?= 01900000-0000-7000-8000-000000000003
+CITY_ID ?= 01900000-0000-7000-8000-000000000001
 GRAPHHOPPER_URL ?= http://localhost:$(GRAPHHOPPER_PORT)
 OSRM_URL ?= http://localhost:$(OSRM_PORT)
 
@@ -49,10 +51,11 @@ export NORMALIZATION_VERSION MAX_SEGMENT_LENGTH_M CORS_ALLOWED_ORIGINS VITE_API_
 export DISTRICT_NORMALIZATION_VERSION
 export VALHALLA_PORT GRAPHHOPPER_PORT OSRM_PORT VALHALLA_URL GRAPHHOPPER_URL OSRM_URL
 export ROUTING_DATASET_METADATA_PATH ROUTING_ENGINE_VERSION
+export DEVELOPMENT_ACTOR_ID
 
-.PHONY: bootstrap db-up migrate geo-import district-import api frontend up down logs check docs-check \
+.PHONY: bootstrap db-up migrate geo-import district-import exploration-rebuild api frontend up down logs check docs-check \
 	routing-prepare routing-images routing-up routing-benchmark routing-down routing-reset routing-spike \
-	stage1-e2e stage1-validate stage1-freeze-check
+	stage1-e2e stage1-validate stage1-freeze-check stage3-coverage-validate
 
 bootstrap:
 	cd backend && go mod download
@@ -78,6 +81,9 @@ district-import:
 	else \
 		cd backend && go run ./cmd/district-import --fixture "$(DISTRICT_TEST_AREA)" --normalization-version "$(DISTRICT_NORMALIZATION_VERSION)"; \
 	fi
+
+exploration-rebuild:
+	cd backend && go run ./cmd/exploration-rebuild --actor "$(DEVELOPMENT_ACTOR_ID)" --city "$(CITY_ID)"
 
 api:
 	cd backend && go run ./cmd/api
@@ -116,6 +122,12 @@ stage1-validate:
 		--output "data/validation/spb-stage1/report.json"
 
 stage1-freeze-check: check stage1-e2e stage1-validate
+
+stage3-coverage-validate:
+	python3 scripts/validation/coverage_v2.py \
+		--root "$(CURDIR)" \
+		--api-url "$(VITE_API_URL)" \
+		--output "data/validation/spb-stage3-coverage-v2/report.json"
 
 routing-prepare:
 	./scripts/routing/prepare.sh

@@ -15,6 +15,11 @@ Regenerate it against the healthy local API:
 make stage1-validate
 ```
 
+The API must expose the frozen Stage 1 profiles (`35/50/100 м`, Balanced `0.6`). The runner never
+publishes a failed result over `report.json`; incompatible current semantics are written to
+`report.failed.json` and return a non-zero status. ADR-0014 results belong to the separate
+`make stage3-coverage-validate` target.
+
 The report contains local performance measurements rather than production sizing. Manual visual
 observations and final product decisions are recorded separately in the Stage 1 validation report
 and ADRs.

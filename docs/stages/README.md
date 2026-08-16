@@ -9,6 +9,7 @@
 |---|---|---|
 | Stage 1 — Geo Exploration Playground | Frozen | [`docs/stage 1/`](../stage%201/README.md) |
 | Stage 2 — Manual Route & Exploration Preview | Engineering complete; 2 field validations pending | [`docs/stage 2/`](../stage%202/stage-2-requirements.md) |
+| Stage 3 — Exploration Core | Implemented; runtime/manual validation pending | [`docs/stage 3/`](../stage%203/README.md) |
 
 Исходный roadmap был разложен по пакетам конкретных этапов. Актуальный status и freeze evidence
 находятся в соответствующем `docs/stage N/`, а не в историческом proposal.

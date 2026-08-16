@@ -1,7 +1,7 @@
 # Frontend
 
-React and TypeScript UI for Gulyaem. The product `/map` route builder creates stateless pedestrian
-route previews with potential exploration coverage; the responsive `/debug/geo` playground keeps
+React and TypeScript UI for Gulyaem. The product `/map` route builder creates previews and owns the
+Stage 3 Walk flow through completion and persistent exploration; the responsive `/debug/geo` playground keeps
 the Stage 1 engineering and validation tools separate.
 
 ## Responsibility
@@ -15,8 +15,11 @@ the Stage 1 engineering and validation tools separate.
 - compare Valhalla, GraphHopper and OSRM geometries, waypoints and benchmark summaries.
 - build a product route from start, destination and ordered intermediate waypoints;
 - recalculate only after discrete edits, cancel stale requests and preserve editable waypoints on errors;
-- render distance, duration and visually distinct potential COMPLETED/PARTIAL coverage without
-  personal-history language.
+- explicitly save a DRAFT or materialize/start directly, then finish, correct and complete a Walk
+  without client-authoritative geometry;
+- restore DRAFT/ACTIVE/REVIEW from durable `activeWalkId` using backend state;
+- render persistent explored segments, current district progress with manual refresh, and a Walk
+  Summary with NEW segments and district deltas.
 
 ## Boundaries and dependencies
 
@@ -27,6 +30,8 @@ OpenFreeMap Liberty style and can be replaced without code changes.
 ## Main scenarios
 
 - open `/map`, choose **+ Прогулка**, tap start and destination, then inspect the route preview;
+- start the Walk, finish into mandatory review, correct if needed, complete and inspect the reward;
+- reload during ACTIVE/REVIEW and recover the same server-owned Walk;
 - add, drag, remove or reorder intermediate waypoints and clear/restart the draft;
 - open `/debug/geo` at the committed dense-center fixture;
 - toggle `EXPLORE`, `ROUTABLE_ONLY`, `IGNORE`, districts, the base map and endpoint markers independently;
@@ -44,6 +49,8 @@ src/App.tsx                         route-level application shell
 src/routeBuilder/RouteBuilder.tsx  product builder state and summary sheet
 src/routeBuilder/RouteBuilderMap.tsx MapLibre route, coverage and draggable markers
 src/routeBuilder/useRoutePreview.ts abortable route-preview lifecycle and stale response guard
+src/routeBuilder/useWalkFlow.ts    materialization, lifecycle, completion and reload recovery
+src/routeBuilder/useExploration.ts actor exploration summary and bbox overlay
 src/geoPlayground/GeoPlayground.tsx feature composition and cross-panel state
 src/geoPlayground/GeoMap.tsx        MapLibre lifecycle, sources, layers and map events
 src/geoPlayground/useViewportData.ts debounced/abortable bbox data lifecycle
@@ -85,8 +92,8 @@ asset and configures MapLibre with that URL.
 
 ## Limitations and technical debt
 
-Stage 2 has no saved route, production Walk or cumulative progress model. The browser calls only
-the Go route-preview endpoint and never Valhalla directly. Routing comparison reads a committed
+Stage 3 still has no authentication or GPS capture; one server-configured development actor owns the
+data. The browser calls only Go APIs and never Valhalla directly. Routing comparison reads a committed
 static report. The debug UI overlays source/normalized routes, unmatched fragments, connectors and
 completed/partial/not-covered segments and compares coverage profiles. Viewport requests are
 debounced by 250 ms and stale requests are aborted. The API may ask the user to zoom in when the

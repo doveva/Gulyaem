@@ -12,13 +12,13 @@ export interface PreviewState {
   error: string | null
 }
 
-export function useRoutePreview(waypoints: Waypoint[], enabled: boolean): PreviewState {
+export function useRoutePreview(waypoints: Waypoint[], enabled: boolean, refreshToken = 0): PreviewState {
   const sequence = useRef(0)
   const [response, setResponse] = useState<{ requestKey: string; preview: RoutePreview | null; error: string | null }>({
     requestKey: '', preview: null, error: null,
   })
   const signature = waypoints.map(({ id, lat, lon }) => `${id}:${lat}:${lon}`).join('|')
-  const requestKey = enabled && waypoints.length >= 2 ? signature : ''
+  const requestKey = enabled && waypoints.length >= 2 ? `${signature}@${refreshToken}` : ''
 
   useEffect(() => {
     if (!requestKey) {

@@ -20,8 +20,8 @@ interface RouteAnalysisPanelProps {
 
 export function RouteAnalysisPanel(props: RouteAnalysisPanelProps) {
   const [profile, setProfile] = useState('balanced')
-  const [radius, setRadius] = useState('50')
-  const [ratio, setRatio] = useState('0.6')
+  const [radius, setRadius] = useState('100')
+  const [ratio, setRatio] = useState('0.4')
   const [minimum, setMinimum] = useState('15')
   const [maximum, setMaximum] = useState('80')
   const [validationError, setValidationError] = useState<string | null>(null)
@@ -62,9 +62,9 @@ export function RouteAnalysisPanel(props: RouteAnalysisPanelProps) {
     </p>}
     <div className="profile-row">
       <label>Профиль<select value={profile} onChange={(event) => setProfile(event.target.value)}>
-        <option value="strict">Strict · 35 м</option>
-        <option value="balanced">Balanced · 50 м</option>
-        <option value="generous">Generous · 100 м</option>
+        <option value="strict">Strict · 50 м</option>
+        <option value="balanced">Balanced · 100 м</option>
+        <option value="generous">Generous · 200 м</option>
         <option value="custom">Custom</option>
       </select></label>
       <button onClick={analyze} disabled={!props.selectedRoute || props.loading}>

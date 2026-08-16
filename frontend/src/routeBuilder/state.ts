@@ -22,6 +22,8 @@ export type BuilderAction =
   | { type: 'remove'; id: string }
   | { type: 'reorder'; id: string; direction: -1 | 1 }
   | { type: 'clear' }
+  | { type: 'restore'; waypoints: Waypoint[] }
+  | { type: 'reset' }
 
 export function builderReducer(state: BuilderState, action: BuilderAction): BuilderState {
   switch (action.type) {
@@ -66,6 +68,10 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
     }
     case 'clear':
       return { mode: 'editing', waypoints: [], addingIntermediate: false }
+    case 'restore':
+      return { mode: 'editing', waypoints: action.waypoints, addingIntermediate: false }
+    case 'reset':
+      return initialBuilderState
   }
 }
 

@@ -11,14 +11,18 @@ import (
 	"time"
 
 	"github.com/doveva/Gulyaem/backend/internal/config"
+	"github.com/doveva/Gulyaem/backend/internal/exploration"
 	"github.com/doveva/Gulyaem/backend/internal/geo/querying"
 	"github.com/doveva/Gulyaem/backend/internal/geo/routeanalysis"
 	"github.com/doveva/Gulyaem/backend/internal/platform/database"
+	explorationdb "github.com/doveva/Gulyaem/backend/internal/platform/database/exploration"
 	"github.com/doveva/Gulyaem/backend/internal/platform/database/geoquery"
 	routeanalysisdb "github.com/doveva/Gulyaem/backend/internal/platform/database/routeanalysis"
+	walksdb "github.com/doveva/Gulyaem/backend/internal/platform/database/walks"
 	"github.com/doveva/Gulyaem/backend/internal/platform/routing/valhalla"
 	"github.com/doveva/Gulyaem/backend/internal/routing/preview"
 	"github.com/doveva/Gulyaem/backend/internal/transport/httpapi"
+	"github.com/doveva/Gulyaem/backend/internal/walks"
 )
 
 func main() {
@@ -56,6 +60,10 @@ func run() error {
 	routingMetadata := valhalla.NewFileMetadataSource(cfg.RoutingDatasetMetadataPath)
 	routingEngine := valhalla.New(cfg.ValhallaURL, cfg.RoutingTimeout, routingMetadata)
 	routePreviewService := preview.NewService(routingEngine, routeAnalyzer, logger)
+	walkRepository := walksdb.New(db)
+	walkService := walks.NewService(routePreviewService, walkRepository)
+	explorationRepository := explorationdb.New(db)
+	explorationService := exploration.NewService(explorationRepository, logger)
 
 	handler := httpapi.NewHandler(httpapi.Dependencies{
 		Database:       db,
@@ -67,6 +75,9 @@ func run() error {
 		RoutePreview:   routePreviewService,
 		Routing:        routingEngine,
 		RoutingDataset: routePreviewService,
+		Actor:          httpapi.StaticActorResolver{ID: cfg.DevelopmentActorID},
+		Walks:          walkService,
+		Exploration:    explorationService,
 	})
 	server := &http.Server{
 		Addr:              cfg.HTTPAddress,

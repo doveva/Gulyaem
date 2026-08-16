@@ -82,6 +82,19 @@ func TestCoverageRadiusSupportedRange(t *testing.T) {
 	}
 }
 
+func TestCoverageProfilePresets(t *testing.T) {
+	tests := map[string]CoverageProfile{
+		"strict":   {Name: "strict", RadiusMeters: 50, CoverageRatio: .8, MinRequiredMeters: 20, MaxRequiredMeters: 120},
+		"balanced": {Name: "balanced", RadiusMeters: 100, CoverageRatio: .4, MinRequiredMeters: 15, MaxRequiredMeters: 80},
+		"generous": {Name: "generous", RadiusMeters: 200, CoverageRatio: .4, MinRequiredMeters: 10, MaxRequiredMeters: 50},
+	}
+	for name, want := range tests {
+		if got := CoverageProfiles[name]; got != want {
+			t.Errorf("CoverageProfiles[%q] = %+v, want %+v", name, got, want)
+		}
+	}
+}
+
 func TestCommittedFixtureContainsFiveValidationRoutes(t *testing.T) {
 	set, err := loadFixtureSet(filepath.Join("..", "..", "..", "..", "data"))
 	if err != nil {

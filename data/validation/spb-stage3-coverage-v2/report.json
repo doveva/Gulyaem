@@ -1,0 +1,899 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "generatedAt": "2026-08-14T16:13:56.800741Z",
+  "environment": {
+    "os": "Darwin",
+    "release": "25.5.0",
+    "architecture": "arm64",
+    "apiUrl": "http://localhost:9080"
+  },
+  "contract": {
+    "fixture": "spb-stage1-validation",
+    "fixtureChecksum": "05fa864bb753ffc4b2c632deae28e6b6ed80b8e677f65a9689d786596aa0e8ae",
+    "normalizationVersion": "stage1-segments-v1",
+    "warmRequests": 30,
+    "bboxP95TargetMilliseconds": 500,
+    "featureLimit": 10000,
+    "coverageProfiles": {
+      "strict": {
+        "name": "strict",
+        "radiusMeters": 50,
+        "coverageRatio": 0.8,
+        "minRequiredMeters": 20,
+        "maxRequiredMeters": 120
+      },
+      "balanced": {
+        "name": "balanced",
+        "radiusMeters": 100,
+        "coverageRatio": 0.4,
+        "minRequiredMeters": 15,
+        "maxRequiredMeters": 80
+      },
+      "generous": {
+        "name": "generous",
+        "radiusMeters": 200,
+        "coverageRatio": 0.4,
+        "minRequiredMeters": 10,
+        "maxRequiredMeters": 50
+      }
+    },
+    "customCoverageRadiusMeters": {
+      "minimum": 5,
+      "maximum": 200,
+      "default": 50
+    },
+    "analysisContextRadiusMeters": 225,
+    "analysisVersion": "route-analysis-v2"
+  },
+  "geoVersion": {
+    "id": "8b2897ce-4a9c-4361-98b1-d7a0fade201d",
+    "cityId": "01900000-0000-7000-8000-000000000001",
+    "source": "openstreetmap",
+    "sourceTimestamp": "2026-08-10T07:08:22Z",
+    "sourceChecksum": "05fa864bb753ffc4b2c632deae28e6b6ed80b8e677f65a9689d786596aa0e8ae",
+    "normalizationVersion": "stage1-segments-v1",
+    "status": "READY",
+    "importedAt": "2026-08-10T07:10:28.20216Z",
+    "importReport": {
+      "outcome": "imported",
+      "nodesProcessed": 127374,
+      "waysProcessed": 25923,
+      "relationsProcessed": 2751,
+      "objectsProcessed": 156048,
+      "candidateWays": 12607,
+      "unsupportedPedestrianAreas": 2,
+      "segmentsGenerated": 28957,
+      "segmentsRejected": 0,
+      "segmentsClipped": 833,
+      "segmentsDeduplicated": 0,
+      "duplicateGeometry": 0,
+      "conflictingDuplicateGeometry": 0,
+      "invalidGeometries": 0,
+      "zeroLengthSegments": 0,
+      "shortSegments": 4362,
+      "longSegments": 13,
+      "exploreSegments": 14896,
+      "routableOnlySegments": 10035,
+      "ignoreSegments": 4026,
+      "totalLengthMeters": 840647.8373743951,
+      "explorableLengthMeters": 448646.63841892884,
+      "minSegmentLengthMeters": 0.09508175967409477,
+      "medianSegmentLengthMeters": 17.091172306117763,
+      "p95SegmentLengthMeters": 97.17428704941652,
+      "maxSegmentLengthMeters": 1039.6019364697888,
+      "warnings": [
+        "missing_source_bbox"
+      ],
+      "durationMillis": 323
+    }
+  },
+  "geoVersionLatencyMilliseconds": 8.799,
+  "viewports": [
+    {
+      "id": "dense-center",
+      "sourceAreaId": "dense-center",
+      "description": "Dense center: Nevsky, Admiralteyskaya, courtyards and canals",
+      "bbox": {
+        "west": 30.3,
+        "south": 59.93,
+        "east": 30.33,
+        "north": 59.945
+      },
+      "segments": {
+        "returnedCount": 6558,
+        "responseBytes": 2764281,
+        "firstMilliseconds": 74.947,
+        "warmRequests": 30,
+        "p50Milliseconds": 50.065,
+        "p95Milliseconds": 55.276,
+        "statistics": {
+          "segmentsTotal": 6558,
+          "exploreCount": 2649,
+          "routableOnlyCount": 2338,
+          "ignoreCount": 1571,
+          "totalLengthMeters": 149941.42657470814,
+          "explorableLengthMeters": 74928.09701044195,
+          "minLengthMeters": 0.096068672689301,
+          "medianLengthMeters": 11.455048165192185,
+          "p95LengthMeters": 86.0125327197627,
+          "maxLengthMeters": 418.30436864417123,
+          "shortSegmentCount": 1730,
+          "longSegmentCount": 0
+        },
+        "reasonDistribution": {
+          "EXPLORE:living_street": {
+            "segments": 29,
+            "lengthMeters": 1429.05
+          },
+          "EXPLORE:pedestrian_street": {
+            "segments": 49,
+            "lengthMeters": 1644.577
+          },
+          "EXPLORE:public_footway": {
+            "segments": 2398,
+            "lengthMeters": 69582.08
+          },
+          "EXPLORE:public_path": {
+            "segments": 3,
+            "lengthMeters": 80.57
+          },
+          "EXPLORE:public_steps": {
+            "segments": 132,
+            "lengthMeters": 1275.313
+          },
+          "EXPLORE:public_street": {
+            "segments": 38,
+            "lengthMeters": 916.507
+          },
+          "IGNORE:foot_access_prohibited": {
+            "segments": 1072,
+            "lengthMeters": 36819.167
+          },
+          "IGNORE:general_access_restricted": {
+            "segments": 353,
+            "lengthMeters": 9949.169
+          },
+          "IGNORE:indoor_path": {
+            "segments": 139,
+            "lengthMeters": 657.768
+          },
+          "IGNORE:unsupported_highway_class": {
+            "segments": 7,
+            "lengthMeters": 451.631
+          },
+          "ROUTABLE_ONLY:conditional_or_discouraged_access": {
+            "segments": 2,
+            "lengthMeters": 503.288
+          },
+          "ROUTABLE_ONLY:crossing_connector": {
+            "segments": 491,
+            "lengthMeters": 2986.287
+          },
+          "ROUTABLE_ONLY:footway_link_connector": {
+            "segments": 4,
+            "lengthMeters": 82.471
+          },
+          "ROUTABLE_ONLY:separate_sidewalk_representation": {
+            "segments": 8,
+            "lengthMeters": 181.765
+          },
+          "ROUTABLE_ONLY:service_access": {
+            "segments": 1828,
+            "lengthMeters": 23341.315
+          },
+          "ROUTABLE_ONLY:traffic_island_connector": {
+            "segments": 5,
+            "lengthMeters": 40.469
+          }
+        }
+      },
+      "districts": {
+        "returnedCount": 3,
+        "responseBytes": 8220,
+        "latencyMilliseconds": 3.487
+      }
+    },
+    {
+      "id": "kalininsky-akademicheskaya",
+      "sourceAreaId": "kalininsky-corridor",
+      "description": "Regular urban network around Akademicheskaya and the southern corridor",
+      "bbox": {
+        "west": 30.385,
+        "south": 60.006,
+        "east": 30.41,
+        "north": 60.024
+      },
+      "segments": {
+        "returnedCount": 5462,
+        "responseBytes": 2301418,
+        "firstMilliseconds": 31.978,
+        "warmRequests": 30,
+        "p50Milliseconds": 35.557,
+        "p95Milliseconds": 39.718,
+        "statistics": {
+          "segmentsTotal": 5462,
+          "exploreCount": 2780,
+          "routableOnlyCount": 2162,
+          "ignoreCount": 520,
+          "totalLengthMeters": 165430.98609788276,
+          "explorableLengthMeters": 78517.93356647468,
+          "minLengthMeters": 0.4028232134055097,
+          "medianLengthMeters": 18.39865504969653,
+          "p95LengthMeters": 96.25745415476689,
+          "maxLengthMeters": 1039.6019364697888,
+          "shortSegmentCount": 605,
+          "longSegmentCount": 7
+        },
+        "reasonDistribution": {
+          "EXPLORE:living_street": {
+            "segments": 10,
+            "lengthMeters": 558.368
+          },
+          "EXPLORE:public_footway": {
+            "segments": 2548,
+            "lengthMeters": 69597.292
+          },
+          "EXPLORE:public_path": {
+            "segments": 152,
+            "lengthMeters": 7429.818
+          },
+          "EXPLORE:public_service_alley": {
+            "segments": 4,
+            "lengthMeters": 140.234
+          },
+          "EXPLORE:public_steps": {
+            "segments": 57,
+            "lengthMeters": 467.818
+          },
+          "EXPLORE:public_street": {
+            "segments": 9,
+            "lengthMeters": 324.404
+          },
+          "IGNORE:foot_access_prohibited": {
+            "segments": 318,
+            "lengthMeters": 20479.996
+          },
+          "IGNORE:general_access_restricted": {
+            "segments": 192,
+            "lengthMeters": 5016.358
+          },
+          "IGNORE:indoor_path": {
+            "segments": 10,
+            "lengthMeters": 322.498
+          },
+          "ROUTABLE_ONLY:crossing_connector": {
+            "segments": 130,
+            "lengthMeters": 804.852
+          },
+          "ROUTABLE_ONLY:footway_link_connector": {
+            "segments": 3,
+            "lengthMeters": 14.858
+          },
+          "ROUTABLE_ONLY:service_access": {
+            "segments": 2026,
+            "lengthMeters": 60264.522
+          },
+          "ROUTABLE_ONLY:traffic_island_connector": {
+            "segments": 3,
+            "lengthMeters": 9.968
+          }
+        }
+      },
+      "districts": {
+        "returnedCount": 1,
+        "responseBytes": 2997,
+        "latencyMilliseconds": 2.126
+      }
+    },
+    {
+      "id": "sosnovka-south-east",
+      "sourceAreaId": "sosnovka-park",
+      "description": "Sosnovka footways, service roads and residential edge",
+      "bbox": {
+        "west": 30.338,
+        "south": 60.012,
+        "east": 30.363,
+        "north": 60.03
+      },
+      "segments": {
+        "returnedCount": 1676,
+        "responseBytes": 712380,
+        "firstMilliseconds": 11.678,
+        "warmRequests": 30,
+        "p50Milliseconds": 12.085,
+        "p95Milliseconds": 13.613,
+        "statistics": {
+          "segmentsTotal": 1676,
+          "exploreCount": 1344,
+          "routableOnlyCount": 225,
+          "ignoreCount": 107,
+          "totalLengthMeters": 86698.79031487647,
+          "explorableLengthMeters": 70924.01299089447,
+          "minLengthMeters": 0.7605630065305057,
+          "medianLengthMeters": 33.02830769266589,
+          "p95LengthMeters": 157.73028937586352,
+          "maxLengthMeters": 810.0873566786807,
+          "shortSegmentCount": 96,
+          "longSegmentCount": 1
+        },
+        "reasonDistribution": {
+          "EXPLORE:living_street": {
+            "segments": 8,
+            "lengthMeters": 370.318
+          },
+          "EXPLORE:public_footway": {
+            "segments": 867,
+            "lengthMeters": 38255.63
+          },
+          "EXPLORE:public_path": {
+            "segments": 414,
+            "lengthMeters": 30593.032
+          },
+          "EXPLORE:public_steps": {
+            "segments": 17,
+            "lengthMeters": 141.552
+          },
+          "EXPLORE:public_street": {
+            "segments": 36,
+            "lengthMeters": 1513.872
+          },
+          "EXPLORE:public_track": {
+            "segments": 2,
+            "lengthMeters": 49.608
+          },
+          "IGNORE:foot_access_prohibited": {
+            "segments": 47,
+            "lengthMeters": 4784.713
+          },
+          "IGNORE:general_access_restricted": {
+            "segments": 54,
+            "lengthMeters": 2752.261
+          },
+          "IGNORE:indoor_path": {
+            "segments": 1,
+            "lengthMeters": 5.793
+          },
+          "IGNORE:pedestrian_access_not_designated": {
+            "segments": 3,
+            "lengthMeters": 477.965
+          },
+          "IGNORE:unsupported_highway_class": {
+            "segments": 2,
+            "lengthMeters": 948.616
+          },
+          "ROUTABLE_ONLY:crossing_connector": {
+            "segments": 41,
+            "lengthMeters": 220.503
+          },
+          "ROUTABLE_ONLY:service_access": {
+            "segments": 184,
+            "lengthMeters": 6584.927
+          }
+        }
+      },
+      "districts": {
+        "returnedCount": 1,
+        "responseBytes": 9518,
+        "latencyMilliseconds": 3.901
+      }
+    }
+  ],
+  "sourceAreaProbes": [
+    {
+      "id": "dense-center",
+      "bbox": {
+        "west": 30.3,
+        "south": 59.93,
+        "east": 30.33,
+        "north": 59.945
+      },
+      "status": 200,
+      "returnedCount": 6558,
+      "responseBytes": 2764281,
+      "latencyMilliseconds": 48.827
+    },
+    {
+      "id": "kalininsky-corridor",
+      "bbox": {
+        "west": 30.385,
+        "south": 60.006,
+        "east": 30.425,
+        "north": 60.041
+      },
+      "status": 422,
+      "errorCode": "feature_limit_exceeded",
+      "message": "viewport contains more than 10000 segments; zoom in"
+    },
+    {
+      "id": "sosnovka-park",
+      "bbox": {
+        "west": 30.326,
+        "south": 60.008,
+        "east": 30.373,
+        "north": 60.036
+      },
+      "status": 422,
+      "errorCode": "feature_limit_exceeded",
+      "message": "viewport contains more than 10000 segments; zoom in"
+    }
+  ],
+  "routes": [
+    {
+      "routeId": "nevsky-kazansky-griboyedov",
+      "name": "Невский — Казанский — канал Грибоедова",
+      "areaId": "dense-center",
+      "intentionalUnmatched": false,
+      "profiles": [
+        {
+          "profile": "strict",
+          "responseBytes": 236687,
+          "latencyMilliseconds": 2241.641,
+          "coverageProfile": {
+            "name": "strict",
+            "radiusMeters": 50,
+            "coverageRatio": 0.8,
+            "minRequiredMeters": 20,
+            "maxRequiredMeters": 120
+          },
+          "contextRadiusMeters": 225,
+          "routeMatchedRatio": 1,
+          "completedNetworkRatio": 0.21634920633198684,
+          "geometricCoveredLengthMeters": 4475.469355029914,
+          "completedNetworkLengthMeters": 3963.8144873633873,
+          "contextExplorableLengthMeters": 18321.372907099703,
+          "routeUnmatchedLengthMeters": 0
+        },
+        {
+          "profile": "balanced",
+          "responseBytes": 238177,
+          "latencyMilliseconds": 2210.271,
+          "coverageProfile": {
+            "name": "balanced",
+            "radiusMeters": 100,
+            "coverageRatio": 0.4,
+            "minRequiredMeters": 15,
+            "maxRequiredMeters": 80
+          },
+          "contextRadiusMeters": 225,
+          "routeMatchedRatio": 1,
+          "completedNetworkRatio": 0.42373298978360596,
+          "geometricCoveredLengthMeters": 7278.078133529959,
+          "completedNetworkLengthMeters": 7763.370118865713,
+          "contextExplorableLengthMeters": 18321.372907099703,
+          "routeUnmatchedLengthMeters": 0
+        },
+        {
+          "profile": "generous",
+          "responseBytes": 243879,
+          "latencyMilliseconds": 2338.04,
+          "coverageProfile": {
+            "name": "generous",
+            "radiusMeters": 200,
+            "coverageRatio": 0.4,
+            "minRequiredMeters": 10,
+            "maxRequiredMeters": 50
+          },
+          "contextRadiusMeters": 225,
+          "routeMatchedRatio": 1,
+          "completedNetworkRatio": 0.7473986655532407,
+          "geometricCoveredLengthMeters": 13257.842795170736,
+          "completedNetworkLengthMeters": 13693.369661869618,
+          "contextExplorableLengthMeters": 18321.372907099703,
+          "routeUnmatchedLengthMeters": 0
+        }
+      ]
+    },
+    {
+      "routeId": "admiralteyskaya-isaac-moyka",
+      "name": "Адмиралтейская — Исаакиевская площадь — Мойка",
+      "areaId": "dense-center",
+      "intentionalUnmatched": false,
+      "profiles": [
+        {
+          "profile": "strict",
+          "responseBytes": 235139,
+          "latencyMilliseconds": 2159.703,
+          "coverageProfile": {
+            "name": "strict",
+            "radiusMeters": 50,
+            "coverageRatio": 0.8,
+            "minRequiredMeters": 20,
+            "maxRequiredMeters": 120
+          },
+          "contextRadiusMeters": 225,
+          "routeMatchedRatio": 0.9913330148238253,
+          "completedNetworkRatio": 0.15576144266514452,
+          "geometricCoveredLengthMeters": 3369.9923177571504,
+          "completedNetworkLengthMeters": 2830.4069371193414,
+          "contextExplorableLengthMeters": 18171.422199806802,
+          "routeUnmatchedLengthMeters": 10
+        },
+        {
+          "profile": "balanced",
+          "responseBytes": 236054,
+          "latencyMilliseconds": 2289.062,
+          "coverageProfile": {
+            "name": "balanced",
+            "radiusMeters": 100,
+            "coverageRatio": 0.4,
+            "minRequiredMeters": 15,
+            "maxRequiredMeters": 80
+          },
+          "contextRadiusMeters": 225,
+          "routeMatchedRatio": 0.9913330148238253,
+          "completedNetworkRatio": 0.325644985435117,
+          "geometricCoveredLengthMeters": 5645.0707221180965,
+          "completedNetworkLengthMeters": 5917.432517591447,
+          "contextExplorableLengthMeters": 18171.422199806802,
+          "routeUnmatchedLengthMeters": 10
+        },
+        {
+          "profile": "generous",
+          "responseBytes": 245099,
+          "latencyMilliseconds": 2250.786,
+          "coverageProfile": {
+            "name": "generous",
+            "radiusMeters": 200,
+            "coverageRatio": 0.4,
+            "minRequiredMeters": 10,
+            "maxRequiredMeters": 50
+          },
+          "contextRadiusMeters": 225,
+          "routeMatchedRatio": 0.9913330148238253,
+          "completedNetworkRatio": 0.755932035762699,
+          "geometricCoveredLengthMeters": 12968.803291501154,
+          "completedNetworkLengthMeters": 13736.360176203458,
+          "contextExplorableLengthMeters": 18171.422199806802,
+          "routeUnmatchedLengthMeters": 10
+        }
+      ]
+    },
+    {
+      "routeId": "konyushennaya-capella-moyka",
+      "name": "Большая Конюшенная — дворы Капеллы — Мойка",
+      "areaId": "dense-center",
+      "intentionalUnmatched": true,
+      "profiles": [
+        {
+          "profile": "strict",
+          "responseBytes": 146555,
+          "latencyMilliseconds": 1543.441,
+          "coverageProfile": {
+            "name": "strict",
+            "radiusMeters": 50,
+            "coverageRatio": 0.8,
+            "minRequiredMeters": 20,
+            "maxRequiredMeters": 120
+          },
+          "contextRadiusMeters": 225,
+          "routeMatchedRatio": 0.9144705690360309,
+          "completedNetworkRatio": 0.12456731776637467,
+          "geometricCoveredLengthMeters": 1890.7578037866426,
+          "completedNetworkLengthMeters": 1432.775321411685,
+          "contextExplorableLengthMeters": 11502.01631618052,
+          "routeUnmatchedLengthMeters": 60
+        },
+        {
+          "profile": "balanced",
+          "responseBytes": 146411,
+          "latencyMilliseconds": 1641.313,
+          "coverageProfile": {
+            "name": "balanced",
+            "radiusMeters": 100,
+            "coverageRatio": 0.4,
+            "minRequiredMeters": 15,
+            "maxRequiredMeters": 80
+          },
+          "contextRadiusMeters": 225,
+          "routeMatchedRatio": 0.9144705690360309,
+          "completedNetworkRatio": 0.2938842679361008,
+          "geometricCoveredLengthMeters": 3031.049213157736,
+          "completedNetworkLengthMeters": 3380.2616448697986,
+          "contextExplorableLengthMeters": 11502.01631618052,
+          "routeUnmatchedLengthMeters": 60
+        },
+        {
+          "profile": "generous",
+          "responseBytes": 153751,
+          "latencyMilliseconds": 1715.833,
+          "coverageProfile": {
+            "name": "generous",
+            "radiusMeters": 200,
+            "coverageRatio": 0.4,
+            "minRequiredMeters": 10,
+            "maxRequiredMeters": 50
+          },
+          "contextRadiusMeters": 225,
+          "routeMatchedRatio": 0.9144705690360309,
+          "completedNetworkRatio": 0.6981536860082685,
+          "geometricCoveredLengthMeters": 8012.311159638285,
+          "completedNetworkLengthMeters": 8030.1750876686765,
+          "contextExplorableLengthMeters": 11502.01631618052,
+          "routeUnmatchedLengthMeters": 60
+        }
+      ]
+    },
+    {
+      "routeId": "akademicheskaya-grazhdansky",
+      "name": "Академическая — Гражданский проспект",
+      "areaId": "kalininsky-corridor",
+      "intentionalUnmatched": false,
+      "profiles": [
+        {
+          "profile": "strict",
+          "responseBytes": 587255,
+          "latencyMilliseconds": 5234.827,
+          "coverageProfile": {
+            "name": "strict",
+            "radiusMeters": 50,
+            "coverageRatio": 0.8,
+            "minRequiredMeters": 20,
+            "maxRequiredMeters": 120
+          },
+          "contextRadiusMeters": 225,
+          "routeMatchedRatio": 1,
+          "completedNetworkRatio": 0.17010333228070781,
+          "geometricCoveredLengthMeters": 8549.330483657279,
+          "completedNetworkLengthMeters": 7595.539062988233,
+          "contextExplorableLengthMeters": 44652.50010772233,
+          "routeUnmatchedLengthMeters": 0
+        },
+        {
+          "profile": "balanced",
+          "responseBytes": 594031,
+          "latencyMilliseconds": 5386.509,
+          "coverageProfile": {
+            "name": "balanced",
+            "radiusMeters": 100,
+            "coverageRatio": 0.4,
+            "minRequiredMeters": 15,
+            "maxRequiredMeters": 80
+          },
+          "contextRadiusMeters": 225,
+          "routeMatchedRatio": 1,
+          "completedNetworkRatio": 0.40255886358873144,
+          "geometricCoveredLengthMeters": 18012.04078896005,
+          "completedNetworkLengthMeters": 17975.25969976041,
+          "contextExplorableLengthMeters": 44652.50010772233,
+          "routeUnmatchedLengthMeters": 0
+        },
+        {
+          "profile": "generous",
+          "responseBytes": 618003,
+          "latencyMilliseconds": 5333.322,
+          "coverageProfile": {
+            "name": "generous",
+            "radiusMeters": 200,
+            "coverageRatio": 0.4,
+            "minRequiredMeters": 10,
+            "maxRequiredMeters": 50
+          },
+          "contextRadiusMeters": 225,
+          "routeMatchedRatio": 1,
+          "completedNetworkRatio": 0.7977754244300752,
+          "geometricCoveredLengthMeters": 35087.56546293814,
+          "completedNetworkLengthMeters": 35622.66722530216,
+          "contextExplorableLengthMeters": 44652.50010772233,
+          "routeUnmatchedLengthMeters": 0
+        }
+      ]
+    },
+    {
+      "routeId": "sosnovka-tikhoretsky-severny",
+      "name": "Сосновка: Тихорецкий — парк — Северный",
+      "areaId": "sosnovka-park",
+      "intentionalUnmatched": false,
+      "profiles": [
+        {
+          "profile": "strict",
+          "responseBytes": 195621,
+          "latencyMilliseconds": 3910.035,
+          "coverageProfile": {
+            "name": "strict",
+            "radiusMeters": 50,
+            "coverageRatio": 0.8,
+            "minRequiredMeters": 20,
+            "maxRequiredMeters": 120
+          },
+          "contextRadiusMeters": 225,
+          "routeMatchedRatio": 1,
+          "completedNetworkRatio": 0.13760972760476256,
+          "geometricCoveredLengthMeters": 5604.968609890625,
+          "completedNetworkLengthMeters": 3703.1986045815265,
+          "contextExplorableLengthMeters": 26910.87809735161,
+          "routeUnmatchedLengthMeters": 0
+        },
+        {
+          "profile": "balanced",
+          "responseBytes": 196960,
+          "latencyMilliseconds": 4261.866,
+          "coverageProfile": {
+            "name": "balanced",
+            "radiusMeters": 100,
+            "coverageRatio": 0.4,
+            "minRequiredMeters": 15,
+            "maxRequiredMeters": 80
+          },
+          "contextRadiusMeters": 225,
+          "routeMatchedRatio": 1,
+          "completedNetworkRatio": 0.4447731772144853,
+          "geometricCoveredLengthMeters": 10288.717861219358,
+          "completedNetworkLengthMeters": 11969.236752990779,
+          "contextExplorableLengthMeters": 26910.87809735161,
+          "routeUnmatchedLengthMeters": 0
+        },
+        {
+          "profile": "generous",
+          "responseBytes": 202313,
+          "latencyMilliseconds": 4369.828,
+          "coverageProfile": {
+            "name": "generous",
+            "radiusMeters": 200,
+            "coverageRatio": 0.4,
+            "minRequiredMeters": 10,
+            "maxRequiredMeters": 50
+          },
+          "contextRadiusMeters": 225,
+          "routeMatchedRatio": 1,
+          "completedNetworkRatio": 0.8349354361711401,
+          "geometricCoveredLengthMeters": 20336.022558112523,
+          "completedNetworkLengthMeters": 22468.84574196065,
+          "contextExplorableLengthMeters": 26910.87809735161,
+          "routeUnmatchedLengthMeters": 0
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "id": "geo-version-ready",
+      "passed": true,
+      "evidence": "READY"
+    },
+    {
+      "id": "fixture-checksum",
+      "passed": true,
+      "evidence": "05fa864bb753ffc4b2c632deae28e6b6ed80b8e677f65a9689d786596aa0e8ae"
+    },
+    {
+      "id": "normalization-version",
+      "passed": true,
+      "evidence": "stage1-segments-v1"
+    },
+    {
+      "id": "no-invalid-geometries",
+      "passed": true,
+      "evidence": 0
+    },
+    {
+      "id": "no-zero-length-segments",
+      "passed": true,
+      "evidence": 0
+    },
+    {
+      "id": "dense-center-segments",
+      "passed": true,
+      "evidence": 6558
+    },
+    {
+      "id": "dense-center-explore",
+      "passed": true,
+      "evidence": 2649
+    },
+    {
+      "id": "dense-center-bbox-p95",
+      "passed": true,
+      "evidence": 55.276
+    },
+    {
+      "id": "dense-center-feature-limit",
+      "passed": true,
+      "evidence": 6558
+    },
+    {
+      "id": "kalininsky-akademicheskaya-segments",
+      "passed": true,
+      "evidence": 5462
+    },
+    {
+      "id": "kalininsky-akademicheskaya-explore",
+      "passed": true,
+      "evidence": 2780
+    },
+    {
+      "id": "kalininsky-akademicheskaya-bbox-p95",
+      "passed": true,
+      "evidence": 39.718
+    },
+    {
+      "id": "kalininsky-akademicheskaya-feature-limit",
+      "passed": true,
+      "evidence": 5462
+    },
+    {
+      "id": "sosnovka-south-east-segments",
+      "passed": true,
+      "evidence": 1676
+    },
+    {
+      "id": "sosnovka-south-east-explore",
+      "passed": true,
+      "evidence": 1344
+    },
+    {
+      "id": "sosnovka-south-east-bbox-p95",
+      "passed": true,
+      "evidence": 13.613
+    },
+    {
+      "id": "sosnovka-south-east-feature-limit",
+      "passed": true,
+      "evidence": 1676
+    },
+    {
+      "id": "dense-center-source-area-protection",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "errorCode": null
+      }
+    },
+    {
+      "id": "kalininsky-corridor-source-area-protection",
+      "passed": true,
+      "evidence": {
+        "status": 422,
+        "errorCode": "feature_limit_exceeded"
+      }
+    },
+    {
+      "id": "sosnovka-park-source-area-protection",
+      "passed": true,
+      "evidence": {
+        "status": 422,
+        "errorCode": "feature_limit_exceeded"
+      }
+    },
+    {
+      "id": "sample-routes",
+      "passed": true,
+      "evidence": 5
+    },
+    {
+      "id": "coverage-profiles",
+      "passed": true,
+      "evidence": 15
+    },
+    {
+      "id": "coverage-parameters",
+      "passed": true,
+      "evidence": {
+        "profiles": {
+          "strict": {
+            "name": "strict",
+            "radiusMeters": 50,
+            "coverageRatio": 0.8,
+            "minRequiredMeters": 20,
+            "maxRequiredMeters": 120
+          },
+          "balanced": {
+            "name": "balanced",
+            "radiusMeters": 100,
+            "coverageRatio": 0.4,
+            "minRequiredMeters": 15,
+            "maxRequiredMeters": 80
+          },
+          "generous": {
+            "name": "generous",
+            "radiusMeters": 200,
+            "coverageRatio": 0.4,
+            "minRequiredMeters": 10,
+            "maxRequiredMeters": 50
+          }
+        },
+        "analysisContextRadiusMeters": 225
+      }
+    }
+  ]
+}

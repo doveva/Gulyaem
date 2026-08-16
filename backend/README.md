@@ -4,7 +4,8 @@ Go modular-monolith backend for the Gulyaem geo exploration service. The current
 provides the HTTP process, PostgreSQL/PostGIS connectivity and a reproducible OSM PBF import that
 builds versioned, classified `StreetSegment` geometry and independently versioned administrative
 districts. Stage 2 adds stateless pedestrian route previews through Valhalla and the existing geo
-analysis core.
+analysis core. Stage 3 adds trusted Route materialization, Walk lifecycle, atomic personal exploration
+completion, actor-scoped reads and rebuildability.
 
 ## Responsibility
 
@@ -18,7 +19,10 @@ analysis core.
 - generate arbitrary pedestrian routes through an engine-neutral port and the Valhalla adapter;
 - verify routing graph metadata against the current READY `GeoDataVersion` before routing;
 - pin the resolved `GeoDataVersion` ID through every route matching and coverage query;
-- compose stateless potential exploration previews without creating `Route` or `Walk` records;
+- keep previews stateless while materializing trusted Routes and coverage snapshots on Walk creation;
+- enforce actor-scoped Walk lifecycle and immutable completion deltas;
+- publish binary personal exploration progress in one idempotent transaction;
+- rebuild current progress from final geometry of completed Walks;
 - run a reproducible routing-engine comparison without importing engine graph identity into the domain;
 - emit structured application logs.
 
@@ -39,6 +43,10 @@ OSM parser types are isolated in `internal/platform/osm`; raw OSM entities are n
   exploration coverage. Product payloads include COMPLETED/PARTIAL coverage and diagnostic
   connectors, while NOT_COVERED context remains represented by aggregate metrics. Routing,
   timeout, no-route and checksum mismatch failures are normalized.
+- `POST /api/v1/walks` recomputes preview, verifies `previewFingerprint` and persists Route + DRAFT Walk.
+- `GET /api/v1/walks/{id}` plus `start`, `finish`, `route`, `complete` and `cancel` own the lifecycle.
+- `GET /api/v1/cities/{cityId}/exploration` and `/segments?bbox=…` return current actor progress.
+- `cmd/exploration-rebuild` atomically reconstructs progress from completed Walk geometry.
 - `GET /api/v1/cities/{cityId}/geo-version` returns the current `READY` version.
 - `GET /api/v1/geo/segments` returns filtered GeoJSON for a bounded viewport with statistics.
 - `GET /api/v1/geo/segments/{segmentId}` returns current or historical segment details; source OSM
@@ -48,7 +56,8 @@ OSM parser types are isolated in `internal/platform/osm`; raw OSM entities are n
 - `GET /api/v1/geo/sample-routes` lists version-aware Stage 1.5 route fixtures.
 - `POST /api/v1/geo/sample-routes/{routeId}/analyze` returns normalized/matched/unmatched geometry,
   exact coverage, provenance and metrics for a selected profile.
-  Strict/Balanced/Generous use radii `35/50/100 м`; custom accepts `5–200 м`. Coverage is evaluated
+  Strict/Balanced/Generous use radii `50/100/200 м`; custom accepts `5–200 м`. Balanced uses
+  ratio `0.4` with the existing `15–80 м` required-length clamp. Coverage is evaluated
   inside a fixed `225 м` analysis context so the maximum custom radius is not clipped. A normalized
   route is split at unmatched gaps and grade changes; PostGIS buffers each grade separately and
   intersects it only with compatible segment IDs.
@@ -66,12 +75,15 @@ cmd/api/                 API executable
 cmd/geo-import/          offline OSM import executable
 cmd/district-import/     offline administrative district import executable
 cmd/routing-spike/       offline Stage 1.6 engine comparison executable
+cmd/exploration-rebuild/ Stage 3 progress rebuild executable
 internal/geo/            geo domain and import application boundary
 internal/geo/segmenting/ WalkabilityProfile and topology-based segmentation
 internal/geo/querying/    bounded read use cases and viewport statistics
 internal/geo/routeanalysis/ stateless sequential matching and coverage semantics
 internal/routing/port/      engine-neutral routing contracts
 internal/routing/preview/   stateless Stage 2 application orchestration
+internal/walks/             Route materialization and Walk lifecycle
+internal/exploration/       completion, personal reads and rebuild
 internal/routingspike/   engine adapters, benchmark metrics and report generation
 internal/config/         environment configuration
 internal/platform/       infrastructure adapters
@@ -168,14 +180,15 @@ route and map-matching fixtures against all engines, and updates the frontend re
 | `CORS_ALLOWED_ORIGINS` | local Vite/Compose origins | comma-separated browser origins |
 | `VALHALLA_URL` | `http://localhost:8002` | Valhalla HTTP endpoint |
 | `ROUTING_DATASET_METADATA_PATH` | `../.routing/valhalla/routing-dataset.json` | graph-bound metadata file read and verified by the API |
+| `DEVELOPMENT_ACTOR_ID` | stable development UUID | server-owned Stage 3 actor context before authentication |
 
 ## Limitations and technical debt
 
 Raw OSM entities remain only in PBF and temporary import memory; district source geometry and
 sample routes remain committed fixtures. The bbox endpoint rejects viewports larger than 25 km²
 and more than 10,000 matching segments instead of truncating them. Stage 1.5 route matching and
-coverage and Stage 2 previews are stateless request-time calculations, not production
-Walk/progress persistence.
+coverage and Stage 2 previews remain stateless request-time calculations. Stage 3 progress is binary
+per StreetSegment: PARTIAL evidence is intentionally not accumulated, and there is no GPS capture.
 `Street.street_id` remains nullable and pedestrian areas/indoor corridors are not converted into
 explorable linear geometry. The PBF parser runs with `CGO_ENABLED=0`; performance is measured
 before changing parser or enabling native zlib. Routing-spike resource measurements are local

@@ -10,6 +10,7 @@ import (
 )
 
 const (
+	AnalysisVersion             = "route-analysis-v2"
 	AnalysisContextRadiusMeters = 225.0
 	MinCoverageRadiusMeters     = 5.0
 	MaxCoverageRadiusMeters     = 200.0
@@ -35,9 +36,9 @@ type CoverageProfile struct {
 }
 
 var CoverageProfiles = map[string]CoverageProfile{
-	"strict":   {Name: "strict", RadiusMeters: 35, CoverageRatio: .8, MinRequiredMeters: 20, MaxRequiredMeters: 120},
-	"balanced": {Name: "balanced", RadiusMeters: 50, CoverageRatio: .6, MinRequiredMeters: 15, MaxRequiredMeters: 80},
-	"generous": {Name: "generous", RadiusMeters: 100, CoverageRatio: .4, MinRequiredMeters: 10, MaxRequiredMeters: 50},
+	"strict":   {Name: "strict", RadiusMeters: 50, CoverageRatio: .8, MinRequiredMeters: 20, MaxRequiredMeters: 120},
+	"balanced": {Name: "balanced", RadiusMeters: 100, CoverageRatio: .4, MinRequiredMeters: 15, MaxRequiredMeters: 80},
+	"generous": {Name: "generous", RadiusMeters: 200, CoverageRatio: .4, MinRequiredMeters: 10, MaxRequiredMeters: 50},
 }
 
 type AnalyzeRequest struct {

@@ -16,6 +16,7 @@ from pathlib import Path
 
 
 CITY_ID = "01900000-0000-7000-8000-000000000001"
+DEFAULT_OUTPUT = "data/validation/spb-stage1/report.json"
 COVERAGE_PROFILES = {
     "strict": {"name": "strict", "radiusMeters": 35, "coverageRatio": 0.8,
                "minRequiredMeters": 20, "maxRequiredMeters": 120},
@@ -24,7 +25,6 @@ COVERAGE_PROFILES = {
     "generous": {"name": "generous", "radiusMeters": 100, "coverageRatio": 0.4,
                  "minRequiredMeters": 10, "maxRequiredMeters": 50},
 }
-PROFILES = tuple(COVERAGE_PROFILES)
 ANALYSIS_CONTEXT_RADIUS_METERS = 225
 
 
@@ -157,11 +157,11 @@ def probe_source_area(api_url, area):
         }
 
 
-def analyze_routes(api_url, routes):
+def analyze_routes(api_url, routes, profile_names):
     results = []
     for route in routes:
-        profiles = []
-        for profile in PROFILES:
+        route_profiles = []
+        for profile in profile_names:
             url = "{}/api/v1/geo/sample-routes/{}/analyze?{}".format(
                 api_url,
                 urllib.parse.quote(route["id"]),
@@ -170,7 +170,7 @@ def analyze_routes(api_url, routes):
             analysis, response_bytes, latency = request_json(
                 url, method="POST", payload={"coverage": {"profile": profile}}
             )
-            profiles.append({
+            route_profiles.append({
                 "profile": profile,
                 "responseBytes": response_bytes,
                 "latencyMilliseconds": rounded(latency),
@@ -188,7 +188,7 @@ def analyze_routes(api_url, routes):
             "name": route["name"],
             "areaId": route["areaId"],
             "intentionalUnmatched": route["intentionalUnmatched"],
-            "profiles": profiles,
+            "profiles": route_profiles,
         })
     return results
 
@@ -197,12 +197,27 @@ def add_check(checks, check_id, passed, evidence):
     checks.append({"id": check_id, "passed": bool(passed), "evidence": evidence})
 
 
-def main():
+def publish_report(report, output):
+    output.parent.mkdir(parents=True, exist_ok=True)
+    if report["status"] == "passed":
+        temporary = output.with_suffix(output.suffix + ".tmp")
+        temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+        temporary.replace(output)
+        return output
+    failed_output = output.with_suffix(".failed" + output.suffix)
+    failed_output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+    return failed_output
+
+
+def main(coverage_profiles=None, default_output=DEFAULT_OUTPUT,
+         analysis_version=None):
+    coverage_profiles = coverage_profiles or COVERAGE_PROFILES
+    profiles = tuple(coverage_profiles)
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default=".")
     parser.add_argument("--api-url", default="http://localhost:8080")
     parser.add_argument("--warm-requests", type=int, default=30)
-    parser.add_argument("--output", default="data/validation/spb-stage1/report.json")
+    parser.add_argument("--output", default=default_output)
     args = parser.parse_args()
     if args.warm_requests < 1:
         parser.error("--warm-requests must be positive")
@@ -243,7 +258,7 @@ def main():
             "bbox": viewport["bbox"],
         }, args.warm_requests))
     source_area_probes = [probe_source_area(api_url, area) for area in manifest["areas"]]
-    route_results = analyze_routes(api_url, routes)
+    route_results = analyze_routes(api_url, routes, profiles)
     checks = []
     expected_checksum = manifest["pbf"]["sha256"]
     add_check(checks, "geo-version-ready", version["status"] == "READY", version["status"])
@@ -279,19 +294,32 @@ def main():
     add_check(checks, "sample-routes", len(route_results) == 5, len(route_results))
     add_check(
         checks, "coverage-profiles",
-        all(len(route["profiles"]) == len(PROFILES) for route in route_results),
+        all(len(route["profiles"]) == len(profiles) for route in route_results),
         sum(len(route["profiles"]) for route in route_results),
     )
     add_check(
         checks, "coverage-parameters",
         all(
-            profile["coverageProfile"] == COVERAGE_PROFILES[profile["profile"]]
+            profile["coverageProfile"] == coverage_profiles[profile["profile"]]
             and profile["contextRadiusMeters"] == ANALYSIS_CONTEXT_RADIUS_METERS
             for route in route_results for profile in route["profiles"]
         ),
-        {"profiles": COVERAGE_PROFILES, "analysisContextRadiusMeters": ANALYSIS_CONTEXT_RADIUS_METERS},
+        {"profiles": coverage_profiles, "analysisContextRadiusMeters": ANALYSIS_CONTEXT_RADIUS_METERS},
     )
 
+    contract = {
+        "fixture": manifest["name"],
+        "fixtureChecksum": expected_checksum,
+        "normalizationVersion": "stage1-segments-v1",
+        "warmRequests": args.warm_requests,
+        "bboxP95TargetMilliseconds": 500,
+        "featureLimit": 10000,
+        "coverageProfiles": coverage_profiles,
+        "customCoverageRadiusMeters": {"minimum": 5, "maximum": 200, "default": 50},
+        "analysisContextRadiusMeters": ANALYSIS_CONTEXT_RADIUS_METERS,
+    }
+    if analysis_version is not None:
+        contract["analysisVersion"] = analysis_version
     report = {
         "schemaVersion": 1,
         "status": "passed" if all(check["passed"] for check in checks) else "failed",
@@ -302,17 +330,7 @@ def main():
             "architecture": platform.machine(),
             "apiUrl": api_url,
         },
-        "contract": {
-            "fixture": manifest["name"],
-            "fixtureChecksum": expected_checksum,
-            "normalizationVersion": "stage1-segments-v1",
-            "warmRequests": args.warm_requests,
-            "bboxP95TargetMilliseconds": 500,
-            "featureLimit": 10000,
-            "coverageProfiles": COVERAGE_PROFILES,
-            "customCoverageRadiusMeters": {"minimum": 5, "maximum": 200, "default": 50},
-            "analysisContextRadiusMeters": ANALYSIS_CONTEXT_RADIUS_METERS,
-        },
+        "contract": contract,
         "geoVersion": version,
         "geoVersionLatencyMilliseconds": rounded(version_ms),
         "viewports": viewports,
@@ -321,13 +339,10 @@ def main():
         "checks": checks,
     }
     output = root / args.output
-    output.parent.mkdir(parents=True, exist_ok=True)
-    temporary = output.with_suffix(output.suffix + ".tmp")
-    temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
-    temporary.replace(output)
+    published_output = publish_report(report, output)
     print(json.dumps({
         "status": report["status"],
-        "output": str(output),
+        "output": str(published_output),
         "viewports": [{
             "id": area["id"],
             "segments": area["segments"]["returnedCount"],

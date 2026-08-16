@@ -3,14 +3,17 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"slices"
 	"time"
 
+	"github.com/doveva/Gulyaem/backend/internal/exploration"
 	"github.com/doveva/Gulyaem/backend/internal/geo/querying"
 	"github.com/doveva/Gulyaem/backend/internal/geo/routeanalysis"
 	"github.com/doveva/Gulyaem/backend/internal/routing/preview"
+	"github.com/doveva/Gulyaem/backend/internal/walks"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -23,6 +26,18 @@ type ReadinessChecker interface {
 	Ready(context.Context) error
 }
 
+type ActorResolver interface {
+	ActorID(context.Context) (string, error)
+}
+type StaticActorResolver struct{ ID string }
+
+func (r StaticActorResolver) ActorID(context.Context) (string, error) {
+	if r.ID == "" {
+		return "", errors.New("development actor is not configured")
+	}
+	return r.ID, nil
+}
+
 type Dependencies struct {
 	Database       HealthChecker
 	Logger         *slog.Logger
@@ -33,12 +48,15 @@ type Dependencies struct {
 	RoutePreview   *preview.Service
 	Routing        HealthChecker
 	RoutingDataset ReadinessChecker
+	Actor          ActorResolver
+	Walks          *walks.Service
+	Exploration    *exploration.Service
 }
 
 func NewHandler(deps Dependencies) http.Handler {
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
-	router.Use(middleware.RealIP)
+	router.Use(middleware.ClientIPFromRemoteAddr)
 	router.Use(middleware.Recoverer)
 	router.Use(requestLogger(deps.Logger))
 	router.Use(middleware.Compress(5, "application/json"))
@@ -77,6 +95,8 @@ func NewHandler(deps Dependencies) http.Handler {
 	registerGeoRoutes(router, deps)
 	registerRouteAnalysisRoutes(router, deps)
 	registerRoutePreviewRoutes(router, deps)
+	registerWalkRoutes(router, deps)
+	registerExplorationRoutes(router, deps)
 
 	return router
 }
@@ -95,7 +115,7 @@ func cors(allowedOrigins []string) func(http.Handler) http.Handler {
 				response.Header().Set("Access-Control-Allow-Origin", origin)
 				response.Header().Set("Vary", "Origin")
 				response.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-				response.Header().Set("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+				response.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,OPTIONS")
 			}
 			if request.Method == http.MethodOptions {
 				response.WriteHeader(http.StatusNoContent)

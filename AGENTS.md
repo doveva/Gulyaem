@@ -1,200 +1,75 @@
-# AGENTS.md — ГуляЕм Stage 2
+# AGENTS.md — ГуляЕм Stage 3
 
 ## Mission
 
-Реализовать только **Stage 2 — Manual Route & Exploration Preview**.
-
-Stage 1 geo core считается frozen. Не переписывать segmentation, WalkabilityProfile или coverage semantics без отдельного ADR и фактического дефекта.
+Реализовывать и стабилизировать только **Stage 3 — Exploration Core** по документам
+`docs/stage 3/`. Stage 1 geo core и Stage 2 routing/preview semantics считаются frozen.
 
 ## Hard scope
 
-Реализуем:
-
-1. production-shaped Valhalla adapter;
-2. reproducible Valhalla dev runtime;
-3. routing dataset compatibility with current `GeoDataVersion`;
-4. stateless route-preview application service;
-5. manual waypoint editing;
-6. pedestrian route generation;
-7. reuse/refactor Stage 1 route analysis for arbitrary generated geometry;
-8. route-to-StreetSegment matching;
-9. Balanced coverage preview;
-10. `/map` route-builder UI;
-11. route/distance/duration display;
-12. potential exploration visualization;
-13. controlled routing/analysis errors;
-14. observability and performance measurements;
-15. mobile + desktop validation.
+- server-side Route materialization из повторно вычисленного preview;
+- opaque versioned `previewFingerprint`;
+- actor-scoped Route, Walk, progress, state и immutable exploration delta;
+- lifecycle `DRAFT → ACTIVE → REVIEW → COMPLETED` и cancellation;
+- correction только в DRAFT/REVIEW;
+- атомарный и идемпотентный completion;
+- только `COMPLETED EXPLORE` влияет на progress;
+- clipped district progress;
+- current exploration reads и bbox GeoJSON;
+- rebuild из final geometry COMPLETED Walk;
+- `/map` full flow, summary и reload recovery;
+- server-side development actor из `DEVELOPMENT_ACTOR_ID`.
 
 ## Hard non-goals
 
-DO NOT implement unless requirements are explicitly changed:
+- authentication/accounts;
+- GPS/GPX capture;
+- Places, Visits, Photos;
+- Sharing, Recommendations, Social;
+- accumulation of PARTIAL coverage;
+- completed Walk edit/delete or Walk history UI;
+- background job infrastructure;
+- user exclusion storage/UI;
+- Redis, microservices, Kubernetes.
 
-- authentication;
-- User;
-- UserStreetProgress;
-- persistence of route previews;
-- `Route` repository as a product entity;
-- Walk lifecycle;
-- Start Walk / Finish Walk;
-- GPS capture;
-- GPX product import;
-- external POI;
-- Places / Visits / Photos;
-- Sharing;
-- Recommendations / route generation by duration;
-- route alternatives UI;
-- Social;
-- vector tiles solely as speculative optimization;
-- ML;
-- Redis;
-- microservices;
-- Kubernetes.
+## Frozen semantics
 
-## Critical semantic rule
-
-Stage 2 has no user history.
-
-Do not expose product concepts such as:
-
-```text
-newMeters
-alreadyExplored
-newStreetRatio
-districtProgress
-```
-
-The Stage 2 concept is:
-
-```text
-Potential Exploration Coverage
-```
-
-Stage 3 will compare this coverage with `UserStreetProgress`.
-
-## Fixed Stage 1 decisions
-
-Treat as frozen inputs:
-
-- Valhalla is the Stage 2 routing engine.
-- Routing engine IDs are diagnostic only.
-- StreetSegment IDs remain internal domain identity.
-- topology-first segmentation;
-- no default artificial max-length split;
-- WalkabilityProfile v1;
-- Balanced coverage:
-  - radius 50 m;
-  - ratio 0.6;
-  - min 15 m;
-  - max 80 m;
+- Valhalla and Stage 2 routing port;
+- StreetSegment IDs are internal identity; Valhalla IDs are diagnostic only;
+- topology-first segmentation and WalkabilityProfile v1;
+- coverage profiles: Strict 50 m, Balanced 100 m / 0.4 / 15–80 m, Generous 200 m;
 - grade-aware local coverage;
 - `ROUTABLE_ONLY` never contributes exploration;
-- bbox + GeoJSON remains initial background-network delivery.
+- bbox + GeoJSON map delivery.
 
-## Architecture rule
-
-Expected high-level flow:
+## Architecture
 
 ```text
-HTTP
- ↓
-Route Preview Service
- ├─→ Routing Engine Port
- │    └─→ Valhalla Adapter
- │
- └─→ Geo Route Analyzer
-      └─→ PostGIS / StreetSegment
+HTTP + ActorContext
+  ↓
+Walks ─→ Stage 2 RoutePreview ─→ Valhalla + RouteAnalyzer
+  ↓
+Exploration completion/read/rebuild
+  ↓
+PostgreSQL/PostGIS
 ```
 
-Routing code MUST NOT own exploration rules.
+Routing does not own exploration rules. Exploration does not call Valhalla. Client geometry,
+segment IDs, progress values and actor IDs are never authoritative.
 
-Geo matching MUST NOT depend on Valhalla edge/tile IDs.
+## Correctness rules
 
-## Stage 1 route-analysis refactor
-
-Current Stage 1 `routeanalysis.Service` loads sample fixtures.
-
-Stage 2 production route preview MUST NOT depend on sample-route fixture files.
-
-Extract/reuse an analyzer that can operate on arbitrary GeoJSON route geometry:
-
-```text
-Analyzer(repository)
-    AnalyzeGeometry(...)
-```
-
-The Stage 1 fixture/debug service may wrap the same analyzer.
-
-Do not duplicate matching/coverage algorithms.
-
-## Routing dataset compatibility
-
-Valhalla graph and current internal GeoDataVersion should come from the same source dataset.
-
-Implement explicit metadata for the routing graph, including at least:
-
-```text
-engine
-engineVersion
-sourceChecksum
-profile
-builtAt?
-```
-
-Before generating a preview, compare routing dataset checksum with current READY `GeoDataVersion.source_checksum`.
-
-Mismatch must be explicit. Do not silently route against one graph and analyze against another.
-
-## API behavior
-
-Primary endpoint:
-
-```text
-POST /api/v1/route-previews
-```
-
-Route preview is stateless and MUST NOT create a persistent `Route` or `Walk`.
-
-## Frontend behavior
-
-Product route:
-
-```text
-/map
-```
-
-Engineering route remains:
-
-```text
-/debug/geo
-```
-
-Do not turn `/debug/geo` into the product flow.
-
-Avoid firing routing requests continuously during pointer movement. Recalculate on discrete edits such as:
-
-- waypoint added;
-- waypoint removed;
-- waypoint reordered;
-- marker drag end.
-
-Discard stale responses.
+- completion and progress/delta/finalization are one transaction;
+- lock persistent state and enforce uniqueness; frontend suppression is not correctness;
+- completion requires current Route `GeoDataVersion` and compatible `ExplorationState`;
+- PARTIAL never accumulates; ROUTABLE_ONLY/IGNORE never create progress;
+- district lengths use clipped intersection geometry;
+- historical delta snapshots are immutable;
+- rebuild uses final Route geometry and publishes current progress atomically.
 
 ## Testing
 
-Required:
-
-- Valhalla adapter contract tests;
-- dataset checksum compatibility tests;
-- route preview service tests;
-- real PostGIS integration tests;
-- API tests;
-- frontend interaction tests;
-- Playwright route-builder flow;
-- manual validation on dense center / regular urban / park environment.
-
-## Coding behavior
-
-Prefer reuse of Stage 1 geo algorithms over replacement.
-
-If Stage 2 evidence suggests a Stage 1 frozen decision is wrong, document the defect and propose an ADR instead of silently changing semantics.
+Maintain Go unit/API tests, real PostGIS integration tests including concurrent completion, frontend
+unit/type/lint checks, Playwright first-Walk and reload flows, migrations, docs-as-code and Compose
+validation. Manual dense-center, regular-urban, park and physical-mobile validation remains required
+before the stage is frozen.

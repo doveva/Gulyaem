@@ -1,8 +1,8 @@
-# ГуляЕм — Stage 2 Code Context Pack
+# ГуляЕм — Stage 3 Exploration Core
 
-Этот пакет фиксирует scope **Stage 2 — Manual Route & Exploration Preview**.
+Текущий scope — **Stage 3: persistent Walk lifecycle и персональная карта исследования**.
 
-Stage 1 считается завершённым и даёт Stage 2 следующие входные решения:
+Stage 1/2 считаются завершёнными и дают Stage 3 следующие входные решения:
 
 - internal `StreetSegment` graph;
 - `WalkabilityProfile v1`;
@@ -10,82 +10,58 @@ Stage 1 считается завершённым и даёт Stage 2 следу
 - `max_segment_length_m=0`;
 - `StreetSegment` identity scoped by `GeoDataVersion`;
 - grade-aware route matching / coverage;
-- default coverage profile **Balanced: 50 м / 0.6 / 15–80 м**;
+- default coverage profile **Balanced: 100 м / 0.4 / 15–80 м**;
 - `PARTIAL` сохраняется;
 - routing engine: **Valhalla**;
 - map delivery: **bbox + GeoJSON** на раннем этапе;
 - React + TypeScript + MapLibre frontend;
 - Go + PostgreSQL/PostGIS backend.
 
-## Главная цель Stage 2
+## Главная цель Stage 3
 
 Получить первую пользовательскую capability поверх реального geo core:
 
 ```text
 Map
  ↓
-Manual Waypoints
+Manual Route Preview
  ↓
-Valhalla Pedestrian Route
+Materialize Route + Walk
  ↓
-Normalized Route Geometry
+Active → Review → Complete
  ↓
-StreetSegment Matching
+ExplorationDelta + Personal Progress
  ↓
-Coverage Preview
- ↓
-Visual Route Preview
+Walk Summary + Persistent Explored Map
 ```
 
 Главный validation question:
 
-> Понятно ли пользователю по карте, какой маршрут он построил и какие части городской сети эта прогулка потенциально позволит исследовать?
+> Является ли `Walk completion → visual city reveal` понятным, мотивирующим и технически воспроизводимым core loop?
 
-## Важная граница Stage 2
+## Важная граница Stage 3
 
-Stage 2 **не имеет персонального exploration state**.
+Stage 2 preview остаётся stateless, а Stage 3 материализует только повторно проверенный сервером
+результат. Browser не передаёт authoritative geometry, segment IDs, progress или actor ID.
 
-Поэтому UI и API не должны называть покрываемые сегменты:
-
-```text
-"новыми для пользователя"
-```
-
-или вычислять:
-
-```text
-new vs already explored
-```
-
-до появления `UserStreetProgress` в Stage 3.
-
-Stage 2 показывает:
-
-- route;
-- distance;
-- duration;
-- matched/unmatched route;
-- `EXPLORE` segments, которые будут `COMPLETED`;
-- `PARTIAL` segments;
-- routing-only connectivity;
-- potential exploration coverage.
+Completion сравнивает trusted coverage snapshot с actor-scoped progress и фиксирует `NEW` /
+`REVISITED`. Только `COMPLETED EXPLORE` влияет на карту; `PARTIAL`, `ROUTABLE_ONLY` и `IGNORE`
+персональный progress не создают.
 
 ## Основные документы
 
 - `AGENTS.md` — scope guard для coding agent.
-- `docs/stage 2/stage-2-requirements.md` — полный Stage 2 scope.
-- `docs/stage 2/architecture-contract.md` — фиксированные архитектурные решения.
-- `docs/stage 2/api-contract.md` — целевой HTTP contract.
-- `docs/stage 2/frontend-flow.md` — route-builder UX/state model.
-- `docs/stage 2/implementation-plan.md` — рекомендуемый порядок реализации.
-- `docs/stage 2/acceptance-criteria.md` — Definition of Done.
-- `docs/stage 2/open-decisions.md` — принятые решения и явно deferred follow-ups.
-- `docs/stage 2/validation-plan.md` — automated + manual validation.
-- `docs/stage 2/validation-report.md` — результаты автоматизированной и runtime-проверки.
+- `docs/stage 3/stage-3-requirements.md` — полный Stage 3 scope.
+- `docs/stage 3/architecture-contract.md` — фиксированные границы модулей и consistency.
+- `docs/stage 3/domain-model.md` и `persistence-model.md` — domain/schema semantics.
+- `docs/stage 3/api-contract.md` и `frontend-flow.md` — HTTP и `/map` flow.
+- `docs/stage 3/acceptance-criteria.md` — Definition of Done.
+- `docs/stage 3/validation-report.md` — фактические результаты и pending field validation.
 
-## Stage 2 Definition of Done
+## Stage 3 Definition of Done
 
-Stage 2 завершён, когда пользователь может на `/map` интерактивно задать start/destination/waypoints, получить pedestrian route от Valhalla, увидеть distance/duration и понятную визуализацию потенциального exploration coverage без сохранения `Walk` или персонального progress.
+Stage 3 завершён после полного preview → Walk → Review → Complete loop, идемпотентного progress,
+сохранения overlay после reload и эквивалентного rebuild из COMPLETED Walk geometry.
 
 ## Индекс документации
 
@@ -124,6 +100,10 @@ _Этот блок сформирован автоматически. Не ре�
 
 - [Saint Petersburg Stage 1 validation report](data/validation/spb-stage1/README.md)
 
+### `data/validation/spb-stage3-coverage-v2/`
+
+- [Stage 3 coverage-v2 validation evidence](data/validation/spb-stage3-coverage-v2/README.md)
+
 ### `docs/adr/`
 
 - [ADR-0001: Основа импорта OSM для Stage 1](docs/adr/0001-osm-import-foundation.md)
@@ -135,6 +115,11 @@ _Этот блок сформирован автоматически. Не ре�
 - [ADR-0007: Freeze topology и WalkabilityProfile после Stage 1](docs/adr/0007-street-segment-stage1-freeze.md)
 - [ADR-0008: Начальные exploration coverage параметры для Stage 2](docs/adr/0008-coverage-parameters-stage1-freeze.md)
 - [ADR-0009: Bbox + GeoJSON как начальная map delivery Stage 2](docs/adr/0009-bbox-geojson-stage2.md)
+- [ADR-0010: Server-side materialization of Stage 2 route preview](docs/adr/0010-stage3-route-materialization.md)
+- [ADR-0011: Atomic and idempotent Walk completion](docs/adr/0011-stage3-walk-completion-transaction.md)
+- [ADR-0012: Rebuildable actor exploration read model](docs/adr/0012-stage3-exploration-read-model.md)
+- [ADR-0013: Actor-scoped Stage 3 data before authentication](docs/adr/0013-stage3-development-actor-context.md)
+- [ADR-0014: Stage 3 coverage radius retuning](docs/adr/0014-stage3-coverage-radius-retuning.md)
 - [ADR-NNNN: Краткое название решения](docs/adr/adr-template.md)
 - [Architecture Decision Records](docs/adr/README.md)
 
@@ -181,6 +166,22 @@ _Этот блок сформирован автоматически. Не ре�
 - [ГуляЕм — Stage 2 Requirements: Manual Route & Exploration Preview](docs/stage%202/stage-2-requirements.md)
 - [Stage 2 — Validation Plan](docs/stage%202/validation-plan.md)
 - [Stage 2 — Validation Report](docs/stage%202/validation-report.md)
+
+### `docs/stage 3/`
+
+- [Stage 3 — Acceptance Criteria](docs/stage%203/acceptance-criteria.md)
+- [Stage 3 — API Contract](docs/stage%203/api-contract.md)
+- [Stage 3 — Architecture Contract](docs/stage%203/architecture-contract.md)
+- [Stage 3 — Domain Model](docs/stage%203/domain-model.md)
+- [Stage 3 — Frontend Flow](docs/stage%203/frontend-flow.md)
+- [Stage 3 — Recommended Implementation Plan](docs/stage%203/implementation-plan.md)
+- [Stage 3 documentation integration](docs/stage%203/INTEGRATION.md)
+- [Stage 3 — Open Decisions](docs/stage%203/open-decisions.md)
+- [Stage 3 — Persistence Model](docs/stage%203/persistence-model.md)
+- [Stage 3 — Exploration Core](docs/stage%203/README.md)
+- [ГуляЕм — Stage 3 Requirements: Exploration Core](docs/stage%203/stage-3-requirements.md)
+- [Stage 3 — Validation Plan](docs/stage%203/validation-plan.md)
+- [Stage 3 — Validation Report](docs/stage%203/validation-report.md)
 
 ### `docs/stages/`
 

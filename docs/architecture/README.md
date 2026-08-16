@@ -6,7 +6,7 @@
 
 Исходные продуктовые и geo-решения находятся в [`source_context`](../source_context/README.md).
 Архитектурный контракт текущего этапа — в
-[`Stage 2`](../stage%202/architecture-contract.md); принятые границы Stage 1 сохранены в
+[`Stage 3`](../stage%203/architecture-contract.md); принятые границы Stage 1 сохранены в
 [`ADR-0007`](../adr/0007-street-segment-stage1-freeze.md) и
 [`ADR-0008`](../adr/0008-coverage-parameters-stage1-freeze.md).
 

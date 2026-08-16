@@ -59,6 +59,10 @@ _Этот блок сформирован автоматически. Не ре�
 
 - [Saint Petersburg Stage 1 validation report](../data/validation/spb-stage1/README.md)
 
+### `data/validation/spb-stage3-coverage-v2/`
+
+- [Stage 3 coverage-v2 validation evidence](../data/validation/spb-stage3-coverage-v2/README.md)
+
 ### `docs/adr/`
 
 - [ADR-0001: Основа импорта OSM для Stage 1](adr/0001-osm-import-foundation.md)
@@ -70,6 +74,11 @@ _Этот блок сформирован автоматически. Не ре�
 - [ADR-0007: Freeze topology и WalkabilityProfile после Stage 1](adr/0007-street-segment-stage1-freeze.md)
 - [ADR-0008: Начальные exploration coverage параметры для Stage 2](adr/0008-coverage-parameters-stage1-freeze.md)
 - [ADR-0009: Bbox + GeoJSON как начальная map delivery Stage 2](adr/0009-bbox-geojson-stage2.md)
+- [ADR-0010: Server-side materialization of Stage 2 route preview](adr/0010-stage3-route-materialization.md)
+- [ADR-0011: Atomic and idempotent Walk completion](adr/0011-stage3-walk-completion-transaction.md)
+- [ADR-0012: Rebuildable actor exploration read model](adr/0012-stage3-exploration-read-model.md)
+- [ADR-0013: Actor-scoped Stage 3 data before authentication](adr/0013-stage3-development-actor-context.md)
+- [ADR-0014: Stage 3 coverage radius retuning](adr/0014-stage3-coverage-radius-retuning.md)
 - [ADR-NNNN: Краткое название решения](adr/adr-template.md)
 - [Architecture Decision Records](adr/README.md)
 
@@ -116,6 +125,22 @@ _Этот блок сформирован автоматически. Не ре�
 - [ГуляЕм — Stage 2 Requirements: Manual Route & Exploration Preview](stage%202/stage-2-requirements.md)
 - [Stage 2 — Validation Plan](stage%202/validation-plan.md)
 - [Stage 2 — Validation Report](stage%202/validation-report.md)
+
+### `docs/stage 3/`
+
+- [Stage 3 — Acceptance Criteria](stage%203/acceptance-criteria.md)
+- [Stage 3 — API Contract](stage%203/api-contract.md)
+- [Stage 3 — Architecture Contract](stage%203/architecture-contract.md)
+- [Stage 3 — Domain Model](stage%203/domain-model.md)
+- [Stage 3 — Frontend Flow](stage%203/frontend-flow.md)
+- [Stage 3 — Recommended Implementation Plan](stage%203/implementation-plan.md)
+- [Stage 3 documentation integration](stage%203/INTEGRATION.md)
+- [Stage 3 — Open Decisions](stage%203/open-decisions.md)
+- [Stage 3 — Persistence Model](stage%203/persistence-model.md)
+- [Stage 3 — Exploration Core](stage%203/README.md)
+- [ГуляЕм — Stage 3 Requirements: Exploration Core](stage%203/stage-3-requirements.md)
+- [Stage 3 — Validation Plan](stage%203/validation-plan.md)
+- [Stage 3 — Validation Report](stage%203/validation-report.md)
 
 ### `docs/stages/`
 

@@ -198,6 +198,19 @@ Must reference the same version.
 
 Requires final Route version equal to current READY version.
 
+The completion transaction holds a shared row lock on that READY `GeoDataVersion` until commit,
+so a geo publisher cannot supersede it between validation and progress publication.
+
+## Materialization
+
+Route creation and correction hold a shared row lock on the preview-pinned READY
+`GeoDataVersion` until commit. If the expected version is no longer READY, persistence aborts with
+the recoverable `route_preview_stale` result.
+
+The database requires every Walk and its Route to have the same actor and city. Segment matches are
+materialized only when their StreetSegment belongs to the Route's pinned `GeoDataVersion`; a
+cross-version match rolls the transaction back as a stale preview.
+
 ## ExplorationState
 
 Pins the version represented by current materialized progress.

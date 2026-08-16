@@ -72,8 +72,8 @@ Routing engine: Valhalla
 Routing profile: pedestrian
 
 Coverage:
-radius = 50 m
-ratio = 0.6
+radius = 100 m
+ratio = 0.4
 min_required = 15 m
 max_required = 80 m
 
@@ -672,8 +672,8 @@ Conceptual response:
     },
     "coverageProfile": {
       "name": "balanced",
-      "radiusMeters": 50,
-      "coverageRatio": 0.6,
+      "radiusMeters": 100,
+      "coverageRatio": 0.4,
       "minRequiredMeters": 15,
       "maxRequiredMeters": 80
     },

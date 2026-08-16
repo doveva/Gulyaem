@@ -1,0 +1,12 @@
+DROP TABLE IF EXISTS walk_district_deltas;
+DROP TABLE IF EXISTS exploration_delta_segments;
+DROP TABLE IF EXISTS exploration_deltas;
+DROP TABLE IF EXISTS exploration_states;
+DROP TABLE IF EXISTS user_street_segment_progress;
+DROP TABLE IF EXISTS walks;
+DROP TABLE IF EXISTS route_segment_matches;
+DROP TABLE IF EXISTS routes;
+DROP TYPE IF EXISTS exploration_state_status;
+DROP TYPE IF EXISTS exploration_delta_segment_kind;
+DROP TYPE IF EXISTS route_coverage_status;
+DROP TYPE IF EXISTS walk_status;

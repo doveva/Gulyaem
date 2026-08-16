@@ -300,6 +300,16 @@ h2 { margin: 0; font-size: 1.04rem; letter-spacing: -.02em; }
 .builder-actions button { padding: 10px; border: 1px solid rgb(33 76 62 / 12%); border-radius: 10px; background: #e7efeb; color: #345c4f; font-size: .72rem; font-weight: 800; cursor: pointer; }
 .builder-actions button.active { border-color: #35af80; background: #d7efe5; color: #176044; }
 .builder-actions button:disabled { opacity: .4; cursor: default; }
+.text-action { width: 100%; margin-top: 8px; padding: 9px; border: 0; background: transparent; color: #637a72; font-size: .72rem; font-weight: 750; cursor: pointer; }
+.progress-card { display: grid; gap: 3px; margin: 14px 0 4px; padding: 14px; border-radius: 14px; background: #e2f0e9; }
+.progress-card strong { color: #1e6e52; font-size: 1.65rem; letter-spacing: -.04em; }
+.progress-card span { color: #5c776d; font-size: .67rem; }
+.active-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 16px 0 10px; }
+.active-metrics > div { display: grid; gap: 3px; padding: 13px; border-radius: 13px; background: #e5f0eb; }
+.active-metrics strong { color: #18533f; font-size: 1.2rem; }
+.active-metrics span { color: #6a8279; font-size: .61rem; text-transform: uppercase; }
+.district-delta { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; padding: 10px 12px; border-radius: 11px; background: #edf4f1; color: #315c4e; font-size: .7rem; }
+.editor-compact { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgb(33 76 62 / 10%); }
 .route-builder .maplibregl-ctrl-bottom-right { bottom: 18px; }
 
 @media (max-width: 860px) {

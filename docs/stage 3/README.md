@@ -1,6 +1,6 @@
 # Stage 3 — Exploration Core
 
-- **Status:** Draft
+- **Status:** Implemented; runtime/manual validation pending
 - **Goal:** превратить stateless route preview в persistent Walk и персональное exploration state
 - **Started:** 2026-08-12
 - **Completed:** —
@@ -12,7 +12,7 @@ Stage 3 опирается на замороженные результаты St
 - versioned internal `StreetSegment`;
 - `EXPLORE / ROUTABLE_ONLY / IGNORE`;
 - topology-first segmentation;
-- grade-aware Balanced coverage;
+- grade-aware Balanced coverage (`100 м / 0.4 / 15–80 м`);
 - Valhalla;
 - routing graph provenance;
 - request-pinned `GeoDataVersion`;
@@ -35,14 +35,16 @@ Stage 3 опирается на замороженные результаты St
 | [`open-decisions.md`](open-decisions.md) | Evidence-driven decisions |
 | [`validation-plan.md`](validation-plan.md) | Automated / integration / E2E / mobile validation |
 
-## Proposed ADR
+## Stage 3 ADR
 
 - [`ADR-0010`](../adr/0010-stage3-route-materialization.md) — server-side materialization from preview.
 - [`ADR-0011`](../adr/0011-stage3-walk-completion-transaction.md) — atomic/idempotent completion.
 - [`ADR-0012`](../adr/0012-stage3-exploration-read-model.md) — progress read model and rebuild.
 - [`ADR-0013`](../adr/0013-stage3-development-actor-context.md) — actor ownership before authentication.
+- [`ADR-0014`](../adr/0014-stage3-coverage-radius-retuning.md) — coverage radii and Balanced threshold retuning.
 
-ADR имеют `Proposed` status до реализации и validation.
+ADR-0010…0013 остаются `Proposed` до финальной Stage 3 validation. ADR-0014 принят на основании
+coverage-v2 validation и product feedback.
 
 ## Stage result
 

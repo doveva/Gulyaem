@@ -3,9 +3,12 @@ package config
 import (
 	"errors"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
+
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$`)
 
 type Config struct {
 	DatabaseURL                string
@@ -20,6 +23,7 @@ type Config struct {
 	ValhallaURL                string
 	RoutingTimeout             time.Duration
 	RoutingDatasetMetadataPath string
+	DevelopmentActorID         string
 }
 
 func Load() (Config, error) {
@@ -28,6 +32,10 @@ func Load() (Config, error) {
 		return Config{}, errors.New("DATABASE_URL is required")
 	}
 
+	developmentActorID := envOrDefault("DEVELOPMENT_ACTOR_ID", "01900000-0000-7000-8000-000000000003")
+	if !uuidPattern.MatchString(developmentActorID) {
+		return Config{}, errors.New("DEVELOPMENT_ACTOR_ID must be a UUID")
+	}
 	return Config{
 		DatabaseURL:        databaseURL,
 		HTTPAddress:        envOrDefault("HTTP_ADDRESS", ":8080"),
@@ -43,6 +51,7 @@ func Load() (Config, error) {
 		RoutingDatasetMetadataPath: envOrDefault(
 			"ROUTING_DATASET_METADATA_PATH", "../.routing/valhalla/routing-dataset.json",
 		),
+		DevelopmentActorID: developmentActorID,
 	}, nil
 }
 

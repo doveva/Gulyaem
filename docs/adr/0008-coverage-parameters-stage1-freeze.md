@@ -1,6 +1,6 @@
 # ADR-0008: Начальные exploration coverage параметры для Stage 2
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0014
 - **Date:** 2026-08-10
 - **Updated:** 2026-08-11
 - **Owners:** команда «ГуляЕм»
@@ -59,4 +59,3 @@ Generous, сохраняя intentional unmatched-фрагмент и не мен
 - [`ADR-0005`](0005-sample-route-matching-and-radius-coverage.md)
 - [`Stage 1 validation report`](../stage%201/validation-report.md)
 - [`Machine-readable evidence`](../../data/validation/spb-stage1/report.json)
-

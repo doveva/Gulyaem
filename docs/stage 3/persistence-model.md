@@ -280,6 +280,26 @@ WHERE id = $walk_id AND actor_id = $actor_id
 FOR UPDATE;
 ```
 
+Completion also holds the current version stable through commit:
+
+```sql
+SELECT id FROM geo_data_versions
+WHERE city_id = $city_id AND status = 'READY'
+FOR SHARE;
+```
+
+Route materialization and correction similarly lock their expected version by ID/city/status before
+writing `routes`. These locks serialize with the geo publisher's `READY → SUPERSEDED` update.
+
+Walk ownership is also enforced structurally. `walks(route_id, actor_id, city_id)` references
+`routes(id, actor_id, city_id)`, so an aggregate cannot attach another actor's or city's Route even
+if a repository bug bypasses application-level ownership checks. Actor-scoped aggregate,
+completion and rebuild queries repeat all three join predicates as defense in depth.
+
+`route_segment_matches` stays narrow, but its repository insert is an `INSERT ... SELECT` joining
+the target Route and StreetSegment on `geo_data_version_id`. Exactly one inserted row is required;
+a missing or cross-version segment aborts the whole materialization as `route_preview_stale`.
+
 Progress rows may be inserted/upserted in deterministic StreetSegment ID order to reduce deadlock
 risk under concurrent requests.
 

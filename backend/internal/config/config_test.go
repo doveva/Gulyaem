@@ -29,3 +29,11 @@ func TestLoadAppliesDefaults(t *testing.T) {
 		t.Fatalf("RoutingDatasetMetadataPath = %q", cfg.RoutingDatasetMetadataPath)
 	}
 }
+
+func TestLoadRejectsInvalidDevelopmentActor(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://example")
+	t.Setenv("DEVELOPMENT_ACTOR_ID", "browser-controlled")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() expected invalid actor error")
+	}
+}

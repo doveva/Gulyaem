@@ -14,6 +14,9 @@ interface RouteBuilderMapProps {
   collection: SegmentCollection
   waypoints: Waypoint[]
   preview: RoutePreview | null
+  routeGeometry?: LineString
+  explored: FeatureCollection<LineString>
+  newlyExplored?: FeatureCollection<LineString>
   calculating: boolean
   acceptingPoint: boolean
   onMapPoint: (lat: number, lon: number) => void
@@ -86,12 +89,18 @@ export function RouteBuilderMap(props: RouteBuilderMapProps) {
 
   useEffect(() => {
     if (!ready || !map.current) return
-    ;(map.current.getSource('product-route') as GeoJSONSource).setData(routeCollection(props.preview))
+    ;(map.current.getSource('product-explored') as GeoJSONSource).setData(props.explored)
+    ;(map.current.getSource('product-new') as GeoJSONSource).setData(props.newlyExplored ?? emptyLineCollection())
+  }, [props.explored, props.newlyExplored, ready])
+
+  useEffect(() => {
+    if (!ready || !map.current) return
+    ;(map.current.getSource('product-route') as GeoJSONSource).setData(routeCollection(props.preview, props.routeGeometry))
     ;(map.current.getSource('product-coverage') as GeoJSONSource).setData(coverageCollection(props.preview))
     map.current.setPaintProperty('product-route-line', 'line-opacity', props.calculating ? 0.38 : 0.96)
     map.current.setPaintProperty('product-coverage-completed', 'line-opacity', props.calculating ? 0.2 : 0.9)
     map.current.setPaintProperty('product-coverage-partial', 'line-opacity', props.calculating ? 0.15 : 0.9)
-  }, [props.preview, props.calculating, ready])
+  }, [props.preview, props.routeGeometry, props.calculating, ready])
 
   useEffect(() => {
     if (!ready || !map.current) return
@@ -140,6 +149,11 @@ function addProductLayers(instance: MapLibreMap) {
     filter: ['==', ['get', 'classification'], 'EXPLORE'],
     paint: { 'line-color': '#71827d', 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 1, 17, 3.5], 'line-opacity': 0.36 },
   })
+  instance.addSource('product-explored', { type: 'geojson', data: emptyLineCollection() })
+  instance.addLayer({
+    id: 'product-explored-line', type: 'line', source: 'product-explored',
+    paint: { 'line-color': '#218a65', 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2.2, 17, 6], 'line-opacity': .82 },
+  })
   instance.addLayer({
     id: 'product-segments-routable', type: 'line', source: 'product-segments',
     filter: ['==', ['get', 'classification'], 'ROUTABLE_ONLY'],
@@ -165,10 +179,16 @@ function addProductLayers(instance: MapLibreMap) {
     id: 'product-route-line', type: 'line', source: 'product-route',
     paint: { 'line-color': '#f7fbf9', 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2.8, 17, 5.5], 'line-opacity': .96 },
   })
+  instance.addSource('product-new', { type: 'geojson', data: emptyLineCollection() })
+  instance.addLayer({
+    id: 'product-new-line', type: 'line', source: 'product-new',
+    paint: { 'line-color': '#ff8a3d', 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 6, 17, 12], 'line-opacity': .96 },
+  })
 }
 
-function routeCollection(preview: RoutePreview | null): FeatureCollection<LineString> {
-  return { type: 'FeatureCollection', features: preview ? [{ type: 'Feature', properties: {}, geometry: preview.routing.geometry }] : [] }
+function routeCollection(preview: RoutePreview | null, geometry?: LineString): FeatureCollection<LineString> {
+  const route = preview?.routing.geometry ?? geometry
+  return { type: 'FeatureCollection', features: route ? [{ type: 'Feature', properties: {}, geometry: route }] : [] }
 }
 
 function coverageCollection(preview: RoutePreview | null): FeatureCollection<LineString> {
